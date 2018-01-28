@@ -31,6 +31,7 @@
 #include <wchar.h>
 #include <Windows.h>
 
+char VERSION[] = "v0.1-Alpha";
 char help[] = " -p <comport#> [-s <serial port config>] [-t] [-o <filename>] [-l <filename>] [-m] [-d] [-q]\r\n"\
 			   "\n"\
 			   "\t\tBK-Precision 390A Multimeter serial data decoder\r\n"\
@@ -47,6 +48,7 @@ char help[] = " -p <comport#> [-s <serial port config>] [-t] [-o <filename>] [-l
 			   "\t-d: debug enabled\r\n"\
 			   "\t-m: show multimeter mode\r\n"\
 			   "\t-q: quiet output\r\n"\
+			   "\t-v: show version\r\n"\
 			   "\n\n\texample: bk390a.exe -p 2 -t -o obsdata.txt\r\n"\
 			   "\r\n";
 
@@ -105,6 +107,12 @@ struct glb {
 	char *com_address;
 };
 
+/* 
+ * We have our file handles as globals only so that
+ * we can cleanly close them atexit()
+ */
+FILE *fo, *fl;			// Output file handles for OBS output, and log output
+HANDLE hComm;			// Handle to the serial port
 
 
 /*-----------------------------------------------------------------\
@@ -217,6 +225,11 @@ int parse_parameters( struct glb *g, int argc, char **argv ) {
 					g->show_mode = 1;
 					break;
 
+				case 'v':
+					fprintf(stdout,"%s\r\n", VERSION);
+					exit(0);
+					break;
+
 				case 's':
 					i++;
 					if (i < argc) g->serial_params = argv[i];
@@ -227,7 +240,7 @@ int parse_parameters( struct glb *g, int argc, char **argv ) {
 					break;
 
 				default:
-						break;
+					break;
 			} // switch
 		}
 	}
@@ -281,6 +294,31 @@ void set_cursor_visible( uint8_t vis ) {
 	SetConsoleCursorInfo(consoleHandle, &info);
 }
 
+/*-----------------------------------------------------------------\
+  Date Code:	: 20180128-134708
+  Function Name	: bk390_cleanup
+  Returns Type	: void
+  	----Parameter List
+	1. void , 
+	------------------
+Exit Codes	: 
+Side Effects	: 
+--------------------------------------------------------------------
+Comments:
+
+--------------------------------------------------------------------
+Changes:
+
+\------------------------------------------------------------------*/
+void bk390_cleanup( void ){
+	CloseHandle(hComm);
+	if (fo) fclose(fo);
+	if (fl) fclose(fl);
+	set_cursor_visible(TRUE);
+	fprintf(stdout, "Exit requested\r\n");
+	fflush(stdout);
+}
+
 
 /*-----------------------------------------------------------------\
   Date Code:	: 20180127-220307
@@ -308,7 +346,6 @@ int main( int argc, char **argv ) {
 	uint8_t d[256];			// Serial data packet
 	uint8_t dps = 0;		// Number of decimal places
 	uint32_t logscale = 1;	// What scale do we multiple the screen values for in the log
-	FILE *fo, *fl;			// Output file handles for OBS output, and log output
 	struct timeval t0, t1;	// Time values for the log files
 	uint64_t t0i, t1i;
 	struct timezone tz;
@@ -316,7 +353,6 @@ int main( int argc, char **argv ) {
 	int i = 0;				// Generic counter
 	char hbc = ' ';			// Heart-beat character
 
-	HANDLE hComm;			// Handle to the serial port
 	char  com_port[256];	// com port path / ie, \\.COM4
 	BOOL  com_read_status;  // return status of various com port functions
 	DWORD dwEventMask;      // Event mask to trigger
@@ -327,9 +363,14 @@ int main( int argc, char **argv ) {
 	fo = fl = NULL;
 
 	if (argc == 1) {
-	   	fprintf(stdout,"Usage: %s %s", argv[0], help);
+		fprintf(stdout,"Usage: %s %s", argv[0], help);
 		exit(1);
 	}
+
+	/*
+	 * Setup the cleanup crew on exit
+	 */
+	atexit(bk390_cleanup);
 
 	/*
 	 * Set up the signal handler for when someone presses ctrl-c
@@ -538,11 +579,6 @@ int main( int argc, char **argv ) {
 		 * and exit 
 		 */
 		if (sigint_pressed) {
-			set_cursor_visible(TRUE);
-			if (fo) fclose(fo);
-			if (fl) fclose(fl);
-			fprintf(stdout, "Exit requested\r\n");
-			fflush(stdout);
 			exit(1);
 		}
 
@@ -556,55 +592,34 @@ int main( int argc, char **argv ) {
 		 * to read the data.
 		 *
 		 */
-		if (g.debug == 0) {
-			com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); //Wait for the character to be received
-		} else {
-			com_read_status = TRUE;
-		}
+		com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); //Wait for the character to be received
 
 
 		if (com_read_status == FALSE) {
 			printf("Error in WaitCommEvent()\r\n");
 
 		} else {
-			if (g.debug == 0) {
+			/*
+			 * If we're not in debug mode, then read the data from the
+			 * com port until we get a \n character, which is the 
+			 * end-of-frame marker.
+			 *
+			 * This is the section where we're capturing the data bytes
+			 * from the multimeter.
+			 *
+			 */
 
-				/*
-				 * If we're not in debug mode, then read the data from the
-				 * com port until we get a \n character, which is the 
-				 * end-of-frame marker.
-				 *
-				 * This is the section where we're capturing the data bytes
-				 * from the multimeter.
-				 *
-				 */
-				end_of_frame_received = 0;
-				i = 0;
-				do {
-					com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
-					d[i] = temp_char;
-					if (temp_char == '\n') { end_of_frame_received = 1; break; }
-					i++;
-				} while ((bytes_read > 0) && (i < sizeof(d)));
-
-			} else {
-				/*
-				 * Fudge some data here so we can test the
-				 * output generation of the screen and files
-				 *
-				 */
-				d[BYTE_RANGE] = 0b00110001;
-				d[BYTE_FUNCTION] = 0b00111011;
-				d[BYTE_STATUS] = 0b00110100;
-				d[BYTE_OPTION_1] = 0;
-				d[BYTE_OPTION_2] = 0b00111011;
-
-				d[1] = 4;
-				d[2] = 3;
-				d[3] = 2;
-				d[4] = 1;
-				sleep(1);
-			}
+			if (g.debug) fprintf(stdout,"DATA START: ");
+			end_of_frame_received = 0;
+			i = 0;
+			do {
+				com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
+				d[i] = temp_char;
+				if (g.debug) fprintf(stdout,"%x ", d[i]);
+				if (temp_char == '\n') { end_of_frame_received = 1; break; }
+				i++;
+			} while ((bytes_read > 0) && (i < sizeof(d)));
+			if (g.debug) fprintf(stdout,":END\r\n");
 		}	
 
 
@@ -767,7 +782,7 @@ int main( int argc, char **argv ) {
 		 * zero the string we generated previously
 		 */
 		if (g.show_mode == 0) {
-		   	mmode[0] = 0;
+			mmode[0] = 0;
 			mode_separator[0] = 0;
 		} 
 

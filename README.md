@@ -1,7 +1,9 @@
 # BK-390A
-BK Precision 390A Series multimeter CLI data capture software for OBS/logging
+BK Precision 390A Series multimeter CLI data capture software for OBS/logging on Windows
 
 # Requirements
+
+If you want to build this software on Windows, you'll require MinGW https://sourceforge.net/projects/mingw/files/latest/download
 
 # Setup
 
