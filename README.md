@@ -1,3 +1,10 @@
+# PREFACE
+
+PLEASE NOTE - This software has not yet been tested with a BK-390A meter, it has been written based off the data protocol datasheet only.   AWAITING TESTERS.
+
+A linux version of this software would be very easy to make, the only change would be the serial port related code (setup and data acquisition).
+
+
 # BK-390A
 BK Precision 390A Series multimeter CLI data capture software for OBS/logging on Windows
 
