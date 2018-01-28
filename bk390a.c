@@ -315,8 +315,6 @@ void bk390_cleanup( void ){
 	if (fo) fclose(fo);
 	if (fl) fclose(fl);
 	set_cursor_visible(TRUE);
-	fprintf(stdout, "Exit requested\r\n");
-	fflush(stdout);
 }
 
 
@@ -400,7 +398,7 @@ int main( int argc, char **argv ) {
 	} 
 
 
-	fprintf(stdout,"BK-Precision 390A Multimeter serial data decoder\n"\
+	if (g.quiet == 0) fprintf(stdout,"BK-Precision 390A Multimeter serial data decoder\n"\
 			"\n"\
 			"  By Paul L Daniels / pldaniels@gmail.com\n"\
 			"  v0.1Alpha / January 27, 2018\n"\
@@ -421,10 +419,10 @@ int main( int argc, char **argv ) {
 	 * Check the outcome of the attempt to create the handle for the com port
 	 */
 	if (hComm == INVALID_HANDLE_VALUE) {
-		printf("Error! - Port %s can't be opened\r\n", com_port);
+		fprintf(stderr,"Error! - Port %s can't be opened\r\n", com_port);
 		exit(1);
 	} else {
-		printf("Port %s Opened\r\n", com_port);
+		if (!g.quiet) printf("Port %s Opened\r\n", com_port);
 	}
 
 	/*
@@ -434,7 +432,7 @@ int main( int argc, char **argv ) {
 	dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
 
 	com_read_status = GetCommState(hComm, &dcbSerialParams);      // Retrieve current settings
-	if (com_read_status == FALSE) { printf("Error in getting GetCommState()\r\n"); }
+	if (com_read_status == FALSE) { fprintf(stderr,"Error in getting GetCommState()\r\n"); }
 
 	dcbSerialParams.BaudRate = CBR_2400;   
 	dcbSerialParams.ByteSize = 7;         
@@ -489,15 +487,17 @@ int main( int argc, char **argv ) {
 
 	com_read_status = SetCommState(hComm, &dcbSerialParams); 
 	if (com_read_status == FALSE) {
-		printf("Error setting com port configuration (2400/7/1/O etc)\r\n");
+		fprintf(stderr,"Error setting com port configuration (2400/7/1/O etc)\r\n");
 		exit(1);
 
 	} else {
+		if (!g.quiet) {
 		printf("Set DCB structure success\r\n");
 		printf("\tBaudrate = %d\r\n", dcbSerialParams.BaudRate);
 		printf("\tByteSize = %d\r\n", dcbSerialParams.ByteSize);
 		printf("\tStopBits = %d\r\n", dcbSerialParams.StopBits);
 		printf("\tParity   = %d\r\n", dcbSerialParams.Parity);
+		}
 	}
 
 	COMMTIMEOUTS timeouts = { 0 };
@@ -507,21 +507,21 @@ int main( int argc, char **argv ) {
 	timeouts.WriteTotalTimeoutConstant   = 50;
 	timeouts.WriteTotalTimeoutMultiplier = 10;
 	if (SetCommTimeouts(hComm, &timeouts) == FALSE) {
-		printf("\tError in setting time-outs\r\n");
+		fprintf(stderr,"\tError in setting time-outs\r\n");
 		exit(1);
 
 	} else { 
-		printf("\tSetting time-outs successful\r\n");
+		if (!g.quiet) printf("\tSetting time-outs successful\r\n");
 	}
 
 
 	com_read_status = SetCommMask(hComm, EV_RXCHAR); //Configure Windows to Monitor the serial device for Character Reception
 	if (com_read_status == FALSE) {
-		printf("\tError in setting CommMask\r\n");
+		fprintf(stderr,"\tError in setting CommMask\r\n");
 		exit(1);
 
 	} else {
-		printf("\tCommMask successful\r\n");
+		if (!g.quiet) printf("\tCommMask successful\r\n");
 	}
 
 
@@ -555,7 +555,7 @@ int main( int argc, char **argv ) {
 		}
 	}
 
-	fprintf(stdout,"\r\nPress Ctrl-C to exit\r\n---------------\r\n");
+	if (!g.quiet) fprintf(stdout,"\r\nPress Ctrl-C to exit\r\n---------------\r\n");
 
 	set_cursor_visible(FALSE);
 
@@ -596,7 +596,7 @@ int main( int argc, char **argv ) {
 
 
 		if (com_read_status == FALSE) {
-			printf("Error in WaitCommEvent()\r\n");
+			fprintf(stderr,"Error in WaitCommEvent()\r\n");
 
 		} else {
 			/*
