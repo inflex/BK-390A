@@ -97,10 +97,10 @@ struct glb {
 	uint8_t quiet;
 	uint8_t show_mode;
 	uint16_t flags;
+	uint8_t com_address;
 	int font_size;
 
 	char serial_params[1024];
-	char com_address[1024];
 };
 
 /* 
@@ -137,8 +137,8 @@ int init( struct glb *g ) {
 	g->show_mode = 0;
 	g->flags = 0;
 	g->font_size = 48;
+	g->com_address = 0;
 
-	g->com_address[0] = '\0';
 	g->serial_params[0] = '\0';
 
 	return 0;
@@ -197,8 +197,10 @@ int parse_parameters( struct glb *g ) {
 				case 'p':
 					/* set address of B35*/
 					i++;
-					if (i < argc) wcstombs(g->com_address, argv[i], sizeof(g->com_address));
-					else {
+					if (i < argc) {
+						g->com_address = _wtoi(argv[i]);
+//					   	wcstombs(g->com_address, argv[i], sizeof(g->com_address));
+					} else {
 						fprintf(stderr,"Insufficient parameters; -p <com port>\n");
 						exit(1);
 					}
@@ -314,7 +316,8 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		//		fprintf(stderr, "Require com port address for BK-390A meter, ie, -p 2\r\n");
 		//		exit(1);
 	} else {
-		snwprintf( com_port, sizeof(com_port), L"\\\\.\\COM%s", g.com_address );
+		//snwprintf( com_port, sizeof(com_port), L"\\\\.\\COM%s", g.com_address );
+		snwprintf( com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address );
 	} 
 
 
@@ -336,10 +339,11 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		 * Check the outcome of the attempt to create the handle for the com port
 		 */
 		if (hComm == INVALID_HANDLE_VALUE) {
-			fprintf(stderr,"Error! - Port %s can't be opened\r\n", com_port);
+			wprintf(L"Error on: %s\r\n", com_port );
+			fprintf(stderr,"Error! - Port '%s' can't be opened\r\n", g.com_address);
 			exit(1);
 		} else {
-			if (!g.quiet) printf("Port %s Opened\r\n", com_port);
+			if (!g.quiet) printf("Port COM%d Opened\r\n", g.com_address);
 		}
 
 		/*
@@ -700,10 +704,10 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 				if (dps > 3) dps = 3;
 
 				switch (dps) {
-					case 0: snprintf(cmd, sizeof(cmd), "% 05.0f%s%s%s%s",v, prefix, units, mode_separator, mmode ); break;
-					case 1: snprintf(cmd, sizeof(cmd), "% 06.1f%s%s%s%s",v/10, prefix, units, mode_separator, mmode ); break;
-					case 2: snprintf(cmd, sizeof(cmd), "% 06.2f%s%s%s%s",v/100, prefix, units, mode_separator, mmode ); break;
-					case 3: snprintf(cmd, sizeof(cmd), "% 06.3f%s%s%s%s",v/1000, prefix, units, mode_separator, mmode ); break;
+					case 0: snprintf(cmd, sizeof(cmd), "% 05.0f%s%s  %s%s",v, prefix, units, mode_separator, mmode ); break;
+					case 1: snprintf(cmd, sizeof(cmd), "% 06.1f%s%s  %s%s",v/10, prefix, units, mode_separator, mmode ); break;
+					case 2: snprintf(cmd, sizeof(cmd), "% 06.2f%s%s  %s%s",v/100, prefix, units, mode_separator, mmode ); break;
+					case 3: snprintf(cmd, sizeof(cmd), "% 06.3f%s%s  %s%s",v/1000, prefix, units, mode_separator, mmode ); break;
 				}
 			}
 		} // if com-read status == TRUE

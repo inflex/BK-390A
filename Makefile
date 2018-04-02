@@ -3,7 +3,7 @@
 #
 
 LOCATION=/usr/local
-CFLAGS=-Wall -O0
+CFLAGS=-O
 LIBS=
 WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32
 WINCC=i686-w64-mingw32-g++
