@@ -42,10 +42,11 @@ char help[] = " -p <comport#> [-s <serial port config>] [-m] [-d] [-q]\r\n"\
 			   "\t\tv0.1Alpha / January 27, 2018\r\n"\
 			   "\r\n"\
 			   "\t-h: This help\r\n"\
+			   "\t-z: Font size (default 48)\r\n"\
 			   "\t-p <comport>: Set the com port for the meter, eg: -p 2\r\n"\
 			   "\t-s <[9600|4800|2400|1200]:[7|8][o|e|n][1|2]>, eg: -s 2400:7o1\r\n"\
 			   "\t-d: debug enabled\r\n"\
-			   "\t-m: show multimeter mode\r\n"\
+			   "\t(-m: show multimeter mode) Not yet available\r\n"\
 			   "\t-q: quiet output\r\n"\
 			   "\t-v: show version\r\n"\
 			   "\n\n\texample: bk390a.exe -p 2 -s 2400:7o1\r\n"\
@@ -96,6 +97,7 @@ struct glb {
 	uint8_t quiet;
 	uint8_t show_mode;
 	uint16_t flags;
+	int font_size;
 
 	char serial_params[1024];
 	char com_address[1024];
@@ -134,6 +136,7 @@ int init( struct glb *g ) {
 	g->quiet = 0;
 	g->show_mode = 0;
 	g->flags = 0;
+	g->font_size = 48;
 
 	g->com_address[0] = '\0';
 	g->serial_params[0] = '\0';
@@ -160,16 +163,17 @@ Changes:
 
 \------------------------------------------------------------------*/
 int parse_parameters( struct glb *g ) {
-   LPWSTR *argv;
-   int argc;
-   int i;
+	LPWSTR *argv;
+	int argc;
+	int i;
+	int fz = 48;
 
-   argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-   if( NULL == argv ) {
-      return 0;
-   }
+	argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+	if( NULL == argv ) {
+		return 0;
+	}
 
-//   else for( i=0; i<nArgs; i++) printf("%d: %ws\n", i, szArglist[i]);
+	//   else for( i=0; i<nArgs; i++) printf("%d: %ws\n", i, szArglist[i]);
 
 	for (i = 0; i < argc; i++) {
 
@@ -178,8 +182,16 @@ int parse_parameters( struct glb *g ) {
 			/* parameter */
 			switch (argv[i][1]) {
 				case 'h':
-					fprintf(stdout,"Usage: %ws %s", argv[0], help);
+					fprintf(stdout,"Usage: %s %s", argv[0], help);
 					exit(1);
+					break;
+
+				case 'z':
+					i++;
+					if (i < argc) fz = _wtoi(argv[i]);
+					if (fz < 10) fz = 10;
+					if (fz > 144) fz = 144;
+					g->font_size = fz;
 					break;
 
 				case 'p':
@@ -228,7 +240,7 @@ int parse_parameters( struct glb *g ) {
 		}
 	}
 
-   LocalFree(argv);
+	LocalFree(argv);
 
 	return 0;
 }
@@ -264,7 +276,6 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	char units[128];		// Measurement units F, V, A, R
 	uint8_t d[256];			// Serial data packet
 	uint8_t dps = 0;		// Number of decimal places
-	uint32_t logscale = 1;	// What scale do we multiple the screen values for in the log
 	struct glb g;			// Global structure for passing variables around
 	int i = 0;				// Generic counter
 
@@ -310,121 +321,121 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 #define COMMS_ENABLED
 #ifdef COMMS_ENABLED
 	if (g.comms_enabled) {
-	/*
-	 * Open the serial port 
-	 */
-	hComm = CreateFile( com_port,                  // Name of port 
-			GENERIC_READ,			// Read Access
-			0,                      // No Sharing
-			NULL,                   // No Security
-			OPEN_EXISTING,          // Open existing port only
-			0,                      // Non overlapped I/O
-			NULL);                  // Null for comm devices
+		/*
+		 * Open the serial port 
+		 */
+		hComm = CreateFile( com_port,                  // Name of port 
+				GENERIC_READ,			// Read Access
+				0,                      // No Sharing
+				NULL,                   // No Security
+				OPEN_EXISTING,          // Open existing port only
+				0,                      // Non overlapped I/O
+				NULL);                  // Null for comm devices
 
-	/*
-	 * Check the outcome of the attempt to create the handle for the com port
-	 */
-	if (hComm == INVALID_HANDLE_VALUE) {
-		fprintf(stderr,"Error! - Port %s can't be opened\r\n", com_port);
-		exit(1);
-	} else {
-		if (!g.quiet) printf("Port %s Opened\r\n", com_port);
-	}
-
-	/*
-	 * Set serial port parameters
-	 */
-	DCB dcbSerialParams = { 0 };                         // Init DCB structure
-	dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
-
-	com_read_status = GetCommState(hComm, &dcbSerialParams);      // Retrieve current settings
-	if (com_read_status == FALSE) { fprintf(stderr,"Error in getting GetCommState()\r\n"); }
-
-	dcbSerialParams.BaudRate = CBR_2400;   
-	dcbSerialParams.ByteSize = 7;         
-	dcbSerialParams.StopBits = ONESTOPBIT; 
-	dcbSerialParams.Parity = ODDPARITY;       
-
-	if (g.serial_params) {
-
-		char *p = g.serial_params;
-
-		if (strncmp(p, "9600:", 5)==0) dcbSerialParams.BaudRate = CBR_9600;      // BaudRate = 9600
-		else if (strncmp(p, "4800:", 5)==0) dcbSerialParams.BaudRate = CBR_4800;      // BaudRate = 4800
-		else if (strncmp(p, "2400:", 5)==0) dcbSerialParams.BaudRate = CBR_2400;      // BaudRate = 2400
-		else if (strncmp(p, "1200:", 5)==0) dcbSerialParams.BaudRate = CBR_1200;      // BaudRate = 1200
-		else {
-			fprintf(stderr,"Invalid serial speed\r\n");
+		/*
+		 * Check the outcome of the attempt to create the handle for the com port
+		 */
+		if (hComm == INVALID_HANDLE_VALUE) {
+			fprintf(stderr,"Error! - Port %s can't be opened\r\n", com_port);
 			exit(1);
+		} else {
+			if (!g.quiet) printf("Port %s Opened\r\n", com_port);
 		}
 
+		/*
+		 * Set serial port parameters
+		 */
+		DCB dcbSerialParams = { 0 };                         // Init DCB structure
+		dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
+
+		com_read_status = GetCommState(hComm, &dcbSerialParams);      // Retrieve current settings
+		if (com_read_status == FALSE) { fprintf(stderr,"Error in getting GetCommState()\r\n"); }
+
+		dcbSerialParams.BaudRate = CBR_2400;   
+		dcbSerialParams.ByteSize = 7;         
+		dcbSerialParams.StopBits = ONESTOPBIT; 
+		dcbSerialParams.Parity = ODDPARITY;       
+
+		if (g.serial_params) {
+
+			char *p = g.serial_params;
+
+			if (strncmp(p, "9600:", 5)==0) dcbSerialParams.BaudRate = CBR_9600;      // BaudRate = 9600
+			else if (strncmp(p, "4800:", 5)==0) dcbSerialParams.BaudRate = CBR_4800;      // BaudRate = 4800
+			else if (strncmp(p, "2400:", 5)==0) dcbSerialParams.BaudRate = CBR_2400;      // BaudRate = 2400
+			else if (strncmp(p, "1200:", 5)==0) dcbSerialParams.BaudRate = CBR_1200;      // BaudRate = 1200
+			else {
+				fprintf(stderr,"Invalid serial speed\r\n");
+				exit(1);
+			}
 
 
-		p = &(g.serial_params[5]);
-		if (*p == '7') dcbSerialParams.ByteSize = 7;         
-		else if (*p == '8') dcbSerialParams.ByteSize = 8;        
-		else {
-			fprintf(stderr,"Invalid serial byte size '%c'\r\n", *p);
+
+			p = &(g.serial_params[5]);
+			if (*p == '7') dcbSerialParams.ByteSize = 7;         
+			else if (*p == '8') dcbSerialParams.ByteSize = 8;        
+			else {
+				fprintf(stderr,"Invalid serial byte size '%c'\r\n", *p);
+				exit(1);
+			}
+
+			p++;
+			if (*p == 'o') dcbSerialParams.Parity = ODDPARITY;       
+			else if (*p == 'e') dcbSerialParams.Parity = EVENPARITY;     
+			else if (*p == 'n') dcbSerialParams.Parity = NOPARITY;      
+			else {
+				fprintf(stderr,"Invalid serial parity type '%c'\r\n", *p);
+				exit(1);
+			}
+
+			p++;
+			if (*p == '1') dcbSerialParams.StopBits = ONESTOPBIT; 
+			else if (*p == '2') dcbSerialParams.StopBits = TWOSTOPBITS;
+			else {
+				fprintf(stderr,"Invalid serial stop bits '%c'\r\n", *p);
+				exit(1);
+			}
+
+		}
+
+		com_read_status = SetCommState(hComm, &dcbSerialParams); 
+		if (com_read_status == FALSE) {
+			fprintf(stderr,"Error setting com port configuration (2400/7/1/O etc)\r\n");
 			exit(1);
+
+		} else {
+			if (!g.quiet) {
+				printf("Set DCB structure success\r\n");
+				printf("\tBaudrate = %ld\r\n", dcbSerialParams.BaudRate);
+				printf("\tByteSize = %ld\r\n", dcbSerialParams.ByteSize);
+				printf("\tStopBits = %d\r\n", dcbSerialParams.StopBits);
+				printf("\tParity   = %d\r\n", dcbSerialParams.Parity);
+			}
 		}
 
-		p++;
-		if (*p == 'o') dcbSerialParams.Parity = ODDPARITY;       
-		else if (*p == 'e') dcbSerialParams.Parity = EVENPARITY;     
-		else if (*p == 'n') dcbSerialParams.Parity = NOPARITY;      
-		else {
-			fprintf(stderr,"Invalid serial parity type '%c'\r\n", *p);
+		COMMTIMEOUTS timeouts = { 0 };
+		timeouts.ReadIntervalTimeout         = 50;
+		timeouts.ReadTotalTimeoutConstant    = 50;
+		timeouts.ReadTotalTimeoutMultiplier  = 10;
+		timeouts.WriteTotalTimeoutConstant   = 50;
+		timeouts.WriteTotalTimeoutMultiplier = 10;
+		if (SetCommTimeouts(hComm, &timeouts) == FALSE) {
+			fprintf(stderr,"\tError in setting time-outs\r\n");
 			exit(1);
+
+		} else { 
+			if (!g.quiet) printf("\tSetting time-outs successful\r\n");
 		}
 
-		p++;
-		if (*p == '1') dcbSerialParams.StopBits = ONESTOPBIT; 
-		else if (*p == '2') dcbSerialParams.StopBits = TWOSTOPBITS;
-		else {
-			fprintf(stderr,"Invalid serial stop bits '%c'\r\n", *p);
+
+		com_read_status = SetCommMask(hComm, EV_RXCHAR); //Configure Windows to Monitor the serial device for Character Reception
+		if (com_read_status == FALSE) {
+			fprintf(stderr,"\tError in setting CommMask\r\n");
 			exit(1);
+
+		} else {
+			if (!g.quiet) printf("\tCommMask successful\r\n");
 		}
-
-	}
-
-	com_read_status = SetCommState(hComm, &dcbSerialParams); 
-	if (com_read_status == FALSE) {
-		fprintf(stderr,"Error setting com port configuration (2400/7/1/O etc)\r\n");
-		exit(1);
-
-	} else {
-		if (!g.quiet) {
-			printf("Set DCB structure success\r\n");
-			printf("\tBaudrate = %d\r\n", dcbSerialParams.BaudRate);
-			printf("\tByteSize = %d\r\n", dcbSerialParams.ByteSize);
-			printf("\tStopBits = %d\r\n", dcbSerialParams.StopBits);
-			printf("\tParity   = %d\r\n", dcbSerialParams.Parity);
-		}
-	}
-
-	COMMTIMEOUTS timeouts = { 0 };
-	timeouts.ReadIntervalTimeout         = 50;
-	timeouts.ReadTotalTimeoutConstant    = 50;
-	timeouts.ReadTotalTimeoutMultiplier  = 10;
-	timeouts.WriteTotalTimeoutConstant   = 50;
-	timeouts.WriteTotalTimeoutMultiplier = 10;
-	if (SetCommTimeouts(hComm, &timeouts) == FALSE) {
-		fprintf(stderr,"\tError in setting time-outs\r\n");
-		exit(1);
-
-	} else { 
-		if (!g.quiet) printf("\tSetting time-outs successful\r\n");
-	}
-
-
-	com_read_status = SetCommMask(hComm, EV_RXCHAR); //Configure Windows to Monitor the serial device for Character Reception
-	if (com_read_status == FALSE) {
-		fprintf(stderr,"\tError in setting CommMask\r\n");
-		exit(1);
-
-	} else {
-		if (!g.quiet) printf("\tCommMask successful\r\n");
-	}
 	}
 
 #endif
@@ -449,9 +460,9 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 	/* Make the window visible on the screen */
 	//ShowWindow (hwnd, nCmdShow);
-	
-			hFont = CreateFont(48,0,0,0,FW_DONTCARE,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_OUTLINE_PRECIS,
-					CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY, VARIABLE_PITCH,TEXT("Impact"));
+
+	hFont = CreateFont(g.font_size,0,0,0,FW_DONTCARE,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_OUTLINE_PRECIS,
+			CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY, VARIABLE_PITCH,TEXT("Impact"));
 
 	/*
 	 * Keep reading, interpreting and converting data until someone
@@ -465,7 +476,6 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		units[0] = '\0';
 		prefix[0] = '\0';
 		mmode[0] = '\0';
-		logscale = 1;
 
 		/* 
 		 *
@@ -702,7 +712,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 			newcmd = 1;
 			InvalidateRect(hstatic,  NULL, FALSE);
 			//usleep(250000UL);
-//			SendMessage(hstatic, WM_USER+11, 1, 2);
+			//			SendMessage(hstatic, WM_USER+11, 1, 2);
 			newcmd = 0;
 		}
 
@@ -724,29 +734,25 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
 	switch (message)                  /* handle the messages */
 	{
 		case WM_CREATE:
-			AddMenus(hwnd);
+			//			AddMenus(hwnd);
 			break;
 
 		case WM_PAINT:
 			HDC hdc;
 			PAINTSTRUCT ps;
 			DWORD color;
-			//HFONT hFont, holdFont;
 			HFONT holdFont;
-			RECT rect;
 
 			hdc = BeginPaint(hwnd, &ps);
-           color = GetSysColor(COLOR_BTNFACE);
-            SetBkColor(hdc, color);
+			color = GetSysColor(COLOR_BTNFACE);
+			SetBkColor(hdc, color);
 			SetTextColor(hdc, RGB(0,0,0));
-			
-//			hFont = CreateFont(48,0,0,0,FW_DONTCARE,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_OUTLINE_PRECIS,
-//					CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY, VARIABLE_PITCH,TEXT("Impact"));
+
 			holdFont = SelectObject(hdc, hFont );
-			TextOutA(hdc, 50, 20, cmd, strlen(cmd));
+			TextOutA(hdc, 5, 5, cmd, strlen(cmd));
 			SelectObject(hdc, holdFont);
 			EndPaint(hwnd, &ps);
-//			fprintf(stderr,"%s\n",cmd);
+			//			fprintf(stderr,"%s\n",cmd);
 			newcmd = 0;
 			break;
 
