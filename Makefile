@@ -5,6 +5,11 @@
 LOCATION=/usr/local
 CFLAGS=-Wall -O2 
 LIBS=
+WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32
+WINCC=i686-w64-mingw32-g++
+# -fpermissive is needed to stop the warnings about casting stoppping the build
+# -municode eliminates the WinMain@16 link error when we're using wWinMain
+WINFLAGS=-fpermissive -municode
 
 OBJ=bk390a
 OFILES=
@@ -14,6 +19,11 @@ default: bk390a
 	${CC} ${CFLAGS} $(COMPONENTS) -c $*.c
 
 all: ${OBJ} 
+
+win-bk390a: ${OFILES} win-bk390a.c 
+#	ctags *.[ch]
+#	clear
+	${WINCC} ${WINFLAGS} $(COMPONENTS) win-bk390a.c ${OFILES} -o win-bk390a.exe ${LIBS} ${WINLIBS}
 
 bk390a: ${OFILES} bk390a.c 
 #	ctags *.[ch]
