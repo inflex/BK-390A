@@ -1,11 +1,5 @@
 Windows version:
 - Autodetect serial port for the meter
 
-- Autoscale the window to suit the maximum required size of the 
-	readout based on the font size.
-
-- Fill the canvas background with the right colour rather than 
-	relying purely on the text background to provide the coverage
-
 - Add stroked outline to text so that it can be used in OBS
 	with a chromakey and not look too awful
