@@ -747,7 +747,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 
          /** range checks **/
          if ((d[BYTE_STATUS] & STATUS_OL) == 1) {
-            StringCbPrintf(cmd, sizeof(cmd), L"O.L.");
+            StringCbPrintf(cmd, sizeof(cmd), L"O.L.       ");
 
          } else {
             if (dps < 0)
