@@ -2,10 +2,22 @@
  * BK Precision Model 390A multimeter data stream reading software
  *
  * V0.1 - January 27, 2018
- * V0.2 - April 4, 2018
  *
  * Written by Paul L Daniels (pldaniels@gmail.com)
  * For Louis Rossmann (to facilitate meter display on OBS).
+ *
+ * Build using MinGW on Windows;
+ *		gcc bk390a.c -o bk390.exe
+ *
+ * Run in command line; (will generate output on screen and to b390a.txt file
+ *for OBS) c:\> bk390.exe -p 4 -t
+ *
+ * For now you'll have to manually determine which COM port your serial adaptor
+ *is appearing as, ie, COM1 use '-p 1',  COM2 use '-p 2' etc.
+ *
+ * Exit the program at any time by hitting ctrl-c
+ *
+ *
  *
  */
 
@@ -21,30 +33,26 @@
 #include <wchar.h>
 #include <windows.h>
 
-char VERSION[] = "v0.2-Beta";
+char VERSION[] = "v0.1-Alpha";
 char help[] = " -p <comport#> [-s <serial port config>] [-m] [-d] [-q]\r\n"
               "\n"
               "\t\tBK-Precision 390A Multimeter serial data decoder\r\n"
               "\r\n"
               "\t\tBy Paul L Daniels / pldaniels@gmail.com\r\n"
-              "\t\tv0.2Alpha / April 4, 2018\r\n"
+              "\t\tv0.1Alpha / January 27, 2018\r\n"
               "\r\n"
               "\t-h: This help\r\n"
-              "\t-z: Font size (default 72, max 256pt)\r\n"
+              "\t-z: Font size (default 48, max 256pt)\r\n"
               "\t-fc <#rrggbb>: Font colour\r\n"
               "\t-bc <#rrggbb>: Background colour\r\n"
-			  "\t-fw <weight>: Font weight, typically 100, 500, 600, or 700 values\r\n"
-			  "\r\n"
-			  "\t-wx <width>: Window width\r\n"
-			  "\t-wy <height>: Window height\r\n"
               "\r\n"
               "\t-p <comport>: Set the com port for the meter, eg: -p 2\r\n"
               "\t-s <[9600|4800|2400|1200]:[7|8][o|e|n][1|2]>, eg: -s 2400:7o1\r\n"
               "\t-d: debug enabled\r\n"
-              "\t-m: show multimeter mode\r\n"
+              "\t(-m: show multimeter mode) Not yet available\r\n"
               "\t-q: quiet output\r\n"
               "\t-v: show version\r\n"
-              "\n\n\texample: bk390a.exe -z 120 -p 4 -s 2400:7o1 -m -fc #10ff10 -bc #000000 -wx 480 -wy 60 -fw 600\r\n"
+              "\n\n\texample: bk390a.exe -p 2 -s 2400:7o1\r\n"
               "\r\n";
 
 #define BYTE_RANGE 0
@@ -103,11 +111,11 @@ struct glb {
 };
 
 /*
- * A whole bunch of globals, becuase I need
- * them accessible in the Windows handler 
+ * We have our file handles as globals only so that
+ * we can cleanly close them atexit()
  */
 HFONT hFont, hFontBg;
-HANDLE hComm;
+HANDLE hComm; // Handle to the serial port
 HWND hstatic;
 wchar_t cmd[1024];
 wchar_t cmd2[1024];
@@ -182,6 +190,8 @@ int parse_parameters(struct glb *g) {
       return 0;
    }
 
+   //   else for( i=0; i<nArgs; i++) printf("%d: %ws\n", i, szArglist[i]);
+
    for (i = 0; i < argc; i++) {
       if (argv[i][0] == '-') {
          /* parameter */
@@ -241,6 +251,8 @@ int parse_parameters(struct glb *g) {
             i++;
             if (i < argc) {
                g->com_address = _wtoi(argv[i]);
+               //					   	wcstombs(g->com_address,
+               // argv[i], sizeof(g->com_address));
             } else {
                fprintf(stderr, "Insufficient parameters; -p <com port>\n");
                exit(1);
@@ -273,7 +285,8 @@ int parse_parameters(struct glb *g) {
             if (i < argc)
                wcstombs(g->serial_params, argv[i], sizeof(g->serial_params));
             else {
-               fprintf(stderr, "Insufficient parameters; -s <parameters> [eg 9600:8:o:1] = 9600, 8-bit, odd, 1-stop\n");
+               fprintf(stderr, "Insufficient parameters; -s <parameters> [eg "
+                               "9600:8:o:1] = 9600, 8-bit, odd, 1-stop\n");
                exit(1);
             }
             break;
@@ -289,11 +302,9 @@ int parse_parameters(struct glb *g) {
    return 0;
 }
 
-/*
- *   Declare Windows procedures
- */
+/*  Declare Windows procedure  */
 LRESULT CALLBACK WindowProcedure(HWND, UINT, WPARAM, LPARAM);
-void AddMenus(HWND); // Not yet using this one
+void AddMenus(HWND);
 
 /*-----------------------------------------------------------------\
   Date Code:	: 20180127-220307
@@ -348,12 +359,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
     * Sanity check our parameters
     */
    if (g.com_address == 99) {
-      fprintf(stderr, "Require com port address for BK-390A meter, ie, -p 2\r\n");
-      exit(1);
+      snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%s", "2");
+      //		fprintf(stderr, "Require com port address for BK-390A meter, ie,
+      //-p 2\r\n"); 		exit(1);
    } else {
+      // snwprintf( com_port, sizeof(com_port), L"\\\\.\\COM%s", g.com_address );
       snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
    }
 
+#define COMMS_ENABLED
+#ifdef COMMS_ENABLED
    if (g.comms_enabled) {
       /*
        * Open the serial port
@@ -473,7 +488,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
             printf("\tSetting time-outs successful\r\n");
       }
 
-      com_read_status = SetCommMask(hComm, EV_RXCHAR); // Configure Windows to Monitor the serial device for Character Reception
+      com_read_status = SetCommMask(hComm, EV_RXCHAR); // Configure Windows to Monitor the
+                                                       // serial device for Character Reception
       if (com_read_status == FALSE) {
          fprintf(stderr, "\tError in setting CommMask\r\n");
          exit(1);
@@ -483,6 +499,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
             printf("\tCommMask successful\r\n");
       }
    }
+
+#endif
 
    /*
     *
@@ -501,11 +519,18 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
    hstatic = CreateWindowW(wc.lpszClassName, L"BK390-A Meter", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 100, 100, 100 + g.window_x,
                            100 + g.window_y, NULL, NULL, hInstance, NULL);
 
+   /* Make the window visible on the screen */
+   // ShowWindow (hwnd, nCmdShow);
+
    hFont = CreateFont(g.font_size, 0, 0, 0, g.font_weight, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
                       CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FIXED_PITCH, TEXT("Andale"));
+   //			CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,
+   // FIXED_PITCH,TEXT("Monotype"));
 
    hFontBg = CreateFont(g.font_size / 4, 0, 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
                         CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FIXED_PITCH, TEXT("Andale"));
+   //			CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,
+   // FIXED_PITCH,TEXT("Monotype"));
 
    units[0] = '\0';
    prefix[0] = '\0';
@@ -545,6 +570,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
        */
       com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); // Wait for the character to be received
       if (com_read_status == FALSE) {
+         //			fprintf(stderr,"Error in WaitCommEvent()\r\n");
          StringCbPrintf(cmd, sizeof(cmd), L"N/C");
          StringCbPrintf(mmmode, sizeof(mmmode), L"Check RS232");
 
@@ -580,9 +606,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
          /*
           * Decode our data.
           *
-          * While the data sheet gives a very nice matrix for the RANGE and FUNCTION values
-          * it's probably more human-readable to break it down in to longer code on a per
-          * function selection.
+          * While the data sheet gives a very nice matrix for the RANGE and
+          * FUNCTION values it's probably more human-readable to break it down in
+          * to longer code on a per function selection.
           *
           */
          switch (d[BYTE_FUNCTION]) {
@@ -890,7 +916,15 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
       GetTextMetrics(hdc, &fontmetrics);
       TextOutW(hdc, 0, 0, cmd, wcslen(cmd));
 
+      //    float ratio = pTextFormat->GetFontSize() /
+      //    (float)metrics.designUnitsPerEm;
+      //  float size = (metrics.ascent + metrics.descent + metrics.lineGap) *
+      //  ratio;
+      // float height = GetHeight();
+
       holdFont = SelectObject(hdc, hFontBg);
+      // TextOutA(hdc, fontmetrics.tmInternalLeading, (glbs->font_size *1.05)
+      // -fontmetrics.tmDescent , cmd2, wcslen(cmd2));
       TextOutW(hdc, 0, (glbs->font_size * 1.05) - fontmetrics.tmDescent, cmd2, wcslen(cmd2));
       EndPaint(hwnd, &ps);
 

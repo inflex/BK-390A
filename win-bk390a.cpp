@@ -9,6 +9,9 @@
  *
  */
 
+#include <windows.h>
+#include <wchar.h>
+#include <shellapi.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -17,9 +20,6 @@
 #include <strsafe.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <wchar.h>
-#include <windows.h>
-#include <shellapi.h>
 
 char VERSION[] = "v0.2-Beta";
 char help[] = " -p <comport#> [-s <serial port config>] [-m] [-d] [-q]\r\n"
@@ -768,15 +768,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
                break;
             case 3:
                dps = 3;
-               StringCbPrintf(prefix, sizeof(prefix), L"μ");
+               StringCbPrintf(prefix, sizeof(prefix), L"\u00B5");
                break;
             case 4:
                dps = 2;
-               StringCbPrintf(prefix, sizeof(prefix), L"μ");
+               StringCbPrintf(prefix, sizeof(prefix), L"\u00B5");
                break;
             case 5:
                dps = 1;
-               StringCbPrintf(prefix, sizeof(prefix), L"μ");
+               StringCbPrintf(prefix, sizeof(prefix), L"\u00B5");
                break;
             case 6:
                dps = 3;
@@ -792,9 +792,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
          case FUNCTION_TEMPERATURE:
             StringCbPrintf(mmmode, sizeof(mmmode), L"Temperature");
             if (d[BYTE_STATUS] & STATUS_JUDGE) {
-               StringCbPrintf(units, sizeof(units), L"'C");
+               StringCbPrintf(units, sizeof(units), L"\u00B0C");
             } else {
-               StringCbPrintf(units, sizeof(units), L"'F");
+               StringCbPrintf(units, sizeof(units), L"\u00B0F");
             }
             break; // FUNCTION_TEMPERATURE
          }
