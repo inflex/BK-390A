@@ -20,10 +20,10 @@ default: bk390a
 
 all: ${OBJ} 
 
-win-bk390a: ${OFILES} win-bk390a.c 
+win-bk390a: ${OFILES} win-bk390a.cpp 
 #	ctags *.[ch]
 #	clear
-	${WINCC} ${CFLAGS} ${WINFLAGS} $(COMPONENTS) win-bk390a.c ${OFILES} -o win-bk390a.exe ${LIBS} ${WINLIBS}
+	${WINCC} ${CFLAGS} ${WINFLAGS} $(COMPONENTS) win-bk390a.cpp ${OFILES} -o win-bk390a.exe ${LIBS} ${WINLIBS}
 
 bk390a: ${OFILES} bk390a.c 
 #	ctags *.[ch]
