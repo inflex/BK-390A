@@ -6,7 +6,8 @@ A linux version of this software would be very easy to make, the only change wou
 
 
 # BK-390A
-BK Precision 390A Series multimeter CLI data capture software for OBS/logging on Windows
+bk390a.exe - BK Precision 390A Series multimeter CLI data capture software for OBS/logging on Windows
+win-bk390a.exe - GUI windowed application
 
 # Requirements
 
@@ -14,14 +15,17 @@ If you want to build this software on Windows, you'll require MinGW https://sour
 
 # Setup
 
-1) Build bk390a
+1) Build bk390a ( Linux mingw64 install required, or mingw64 for Windows)
 
-	gcc bk390a.c -o bk390a.exe 
+	make bk390a
+	(or)
+	make win-bk390a
+	
 
 
 3) Run from the command line
 
-	bk390a.exe -p 4 -t 
+	win-bk390a.exe -z 120 -p 4 -s 2400:7o1 -m -fc #10ff10 -bc #000000 -wx 480 -wy 60 -fw 600
 
 The program will display in text the current meter display and also generate a text file called "bk390a.txt" which can be read in to programs like OpenBroadcaster so you can have a live on-screen-display of the multimeter.
 

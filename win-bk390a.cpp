@@ -107,15 +107,17 @@ struct glb {
  * them accessible in the Windows handler
  */
 HFONT hFont, hFontBg;
+HFONT holdFont;
 HANDLE hComm;
 HWND hstatic;
+HBRUSH BBrush = CreateSolidBrush(RGB(0,0,255));
 wchar_t cmd[1024];
 wchar_t cmd2[1024];
 wchar_t mmmode[1024];
 int tick = 0;
 int newcmd = 0;
 struct glb *glbs;
-TEXTMETRIC fontmetrics;
+TEXTMETRIC fontmetrics, smallfontmetrics;
 
 /*-----------------------------------------------------------------\
   Date Code:	: 20180127-220248
@@ -134,8 +136,8 @@ Changes:
 
 \------------------------------------------------------------------*/
 int init(struct glb *g) {
-   g->window_x = 450;
-   g->window_y = 250;
+   g->window_x = 9999;
+   g->window_y = 9999;
    g->debug = 0;
    g->comms_enabled = 1;
    g->quiet = 0;
@@ -293,7 +295,6 @@ int parse_parameters(struct glb *g) {
  *   Declare Windows procedures
  */
 LRESULT CALLBACK WindowProcedure(HWND, UINT, WPARAM, LPARAM);
-void AddMenus(HWND); // Not yet using this one
 
 /*-----------------------------------------------------------------\
   Date Code:	: 20180127-220307
@@ -489,22 +490,41 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
     * Now do all the ugly Windows stuff
     *
     */
+	BBrush = CreateSolidBrush(g.background_color);
 
    wc.style = CS_HREDRAW | CS_VREDRAW;
-   wc.lpszClassName = L"BK390-A Meter";
+   wc.lpszClassName = L"BK-390A Meter";
    wc.hInstance = hInstance;
-   wc.hbrBackground = GetSysColorBrush(COLOR_3DFACE);
+   wc.hbrBackground = BBrush;
    wc.lpfnWndProc = WindowProcedure;
    wc.hCursor = LoadCursor(0, IDC_ARROW);
 
-   RegisterClassW(&wc);
-   hstatic = CreateWindowW(wc.lpszClassName, L"BK390-A Meter", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 100, 100, 100 + g.window_x, 100 + g.window_y, NULL, NULL, hInstance, NULL);
+     NONCLIENTMETRICS metrics;
+	 metrics.cbSize = sizeof(NONCLIENTMETRICS);
+    SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &metrics, 0);
 
-   hFont = CreateFont(g.font_size, 0, 0, 0, g.font_weight, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FIXED_PITCH,
+   RegisterClassW(&wc);
+
+   {
+	   HDC dc;
+
+	   dc = GetDC( hstatic );
+   hFont = CreateFont(-(g.font_size), 0, 0, 0, g.font_weight, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FIXED_PITCH,
                       TEXT("Andale"));
 
-   hFontBg = CreateFont(g.font_size / 4, 0, 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FIXED_PITCH,
+   holdFont = SelectObject(dc, hFont);
+   GetTextMetrics(dc, &fontmetrics);
+
+   hFontBg = CreateFont(-(g.font_size / 4), 0, 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FIXED_PITCH,
                         TEXT("Andale"));
+   holdFont = SelectObject(dc, hFontBg);
+   GetTextMetrics(dc, &smallfontmetrics);
+   if (g.window_x == 9999) g.window_x = fontmetrics.tmAveCharWidth *9;
+   if (g.window_y == 9999) g.window_y = ((((fontmetrics.tmAscent) + smallfontmetrics.tmHeight + metrics.iCaptionHeight) *GetDeviceCaps(dc, LOGPIXELSY)) /72);
+
+   hstatic = CreateWindowW(wc.lpszClassName, L"BK-390A Meter", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 50, 50, g.window_x, g.window_y, NULL, NULL, hInstance, NULL);
+
+   }
 
    units[0] = '\0';
    prefix[0] = '\0';
@@ -768,25 +788,23 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
    switch (message) /* handle the messages */
    {
    case WM_CREATE:
-      // AddMenus(hwnd);
       break;
 
    case WM_PAINT:
       HDC hdc;
       PAINTSTRUCT ps;
-      DWORD color;
-      HFONT holdFont;
 
       hdc = BeginPaint(hwnd, &ps);
-      color = GetSysColor(COLOR_BTNFACE);
+
       SetBkColor(hdc, glbs->background_color);
       SetTextColor(hdc, glbs->font_color);
+
       holdFont = SelectObject(hdc, hFont);
-      GetTextMetrics(hdc, &fontmetrics);
       TextOutW(hdc, 0, 0, cmd, wcslen(cmd));
 
       holdFont = SelectObject(hdc, hFontBg);
-      TextOutW(hdc, 0, (glbs->font_size * 1.05) - fontmetrics.tmDescent, cmd2, wcslen(cmd2));
+      TextOutW(hdc, smallfontmetrics.tmAveCharWidth, fontmetrics.tmAscent *1.1, cmd2, wcslen(cmd2));
+
       EndPaint(hwnd, &ps);
 
       newcmd = 0;
@@ -812,20 +830,4 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
    }
 
    return 0;
-}
-
-void AddMenus(HWND hwnd) {
-   HMENU hMenubar;
-   HMENU hMenu;
-
-   hMenubar = CreateMenu();
-   hMenu = CreateMenu();
-
-   AppendMenuW(hMenu, MF_STRING, IDM_FONT_COLOUR, L"&Font");
-   AppendMenuW(hMenu, MF_STRING, IDM_BG_COLOUR, L"&Background");
-   AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
-   AppendMenuW(hMenu, MF_STRING, IDM_FILE_QUIT, L"&Quit");
-
-   AppendMenuW(hMenubar, MF_POPUP, (UINT_PTR)hMenu, L"&File");
-   SetMenu(hwnd, hMenubar);
 }
