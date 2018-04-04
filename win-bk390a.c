@@ -117,9 +117,9 @@ struct glb {
 HFONT hFont, hFontBg;
 HANDLE hComm;			// Handle to the serial port
 HWND hstatic;
-char cmd[1024];
-char cmd2[1024];
-char mmmode[1024];
+wchar_t cmd[1024];
+wchar_t cmd2[1024];
+wchar_t mmmode[1024];
 int tick = 0;
 int newcmd = 0;
 struct glb *glbs;
@@ -323,9 +323,8 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		PWSTR lpCmdLine, int nCmdShow) {
 
 
-	char mode_separator[] = "\r\n  ";
-	char prefix[128];		// Units prefix u, m, k, M etc 
-	char units[128];		// Measurement units F, V, A, R
+	wchar_t prefix[128];		// Units prefix u, m, k, M etc 
+	wchar_t units[128];		// Measurement units F, V, A, R
 	uint8_t d[256];			// Serial data packet
 	uint8_t dps = 0;		// Number of decimal places
 	struct glb g;			// Global structure for passing variables around
@@ -563,8 +562,8 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); //Wait for the character to be received
 		if (com_read_status == FALSE) {
 			//			fprintf(stderr,"Error in WaitCommEvent()\r\n");
-			snprintf(cmd,sizeof(cmd),"N/C");			
-			snprintf(mmmode,sizeof(mmmode),"Check RS232");
+			StringCbPrintf(cmd,sizeof(cmd),L"N/C");			
+			StringCbPrintf(mmmode,sizeof(mmmode),L"Check RS232");
 
 		} else {
 			/*
@@ -601,11 +600,11 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 			switch (d[BYTE_FUNCTION]) {
 
 				case FUNCTION_VOLTAGE: 
-					snprintf(units,sizeof(units),"V");
-					snprintf(mmmode,sizeof(mmmode),"Volts");
+					StringCbPrintf(units,sizeof(units),L"V");
+					StringCbPrintf(mmmode,sizeof(mmmode),L"Volts");
 
 					switch (d[BYTE_RANGE] & 0x0F) {
-						case 0: dps = 1; snprintf(prefix, sizeof(prefix), "m"); break;
+						case 0: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"m"); break;
 						case 1: dps = 3; break;
 						case 2: dps = 2; break;
 						case 3: dps = 1; break;
@@ -615,9 +614,9 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 
 				case FUNCTION_CURRENT_UA:
-					snprintf(units,sizeof(units),"A");
-					snprintf(prefix,sizeof(prefix),"m");
-					snprintf(mmmode,sizeof(mmmode),"Amps");
+					StringCbPrintf(units,sizeof(units),L"A");
+					StringCbPrintf(prefix,sizeof(prefix),L"m");
+					StringCbPrintf(mmmode,sizeof(mmmode),L"Amps");
 
 					switch (d[BYTE_RANGE] & 0x0F) {
 						case 0: dps = 2; break;
@@ -628,9 +627,9 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 
 				case FUNCTION_CURRENT_MA:
-					snprintf(units,sizeof(units),"A");
-					snprintf(prefix,sizeof(prefix),"μ");
-					snprintf(mmmode,sizeof(mmmode),"Amps");
+					StringCbPrintf(units,sizeof(units),L"A");
+					StringCbPrintf(prefix,sizeof(prefix),L"\u00B5");
+					StringCbPrintf(mmmode,sizeof(mmmode),L"Amps");
 
 					switch (d[BYTE_RANGE] & 0x0F) {
 						case 0: dps = 1; break;
@@ -640,65 +639,65 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 
 				case FUNCTION_CURRENT_A:
-					snprintf(units,sizeof(units),"A");
-					snprintf(mmmode,sizeof(mmmode),"Amps");
+					StringCbPrintf(units,sizeof(units),L"A");
+					StringCbPrintf(mmmode,sizeof(mmmode),L"Amps");
 					break; // FUNCTION_CURRENT_A
 
 
 
 				case FUNCTION_OHMS:
-					snprintf(mmmode,sizeof(mmmode),"Resistance");
-					snprintf(units,sizeof(units),"R");
+					StringCbPrintf(mmmode,sizeof(mmmode),L"Resistance");
+					StringCbPrintf(units,sizeof(units),L"\u2126");
 
 					switch (d[BYTE_RANGE] & 0x0F) {
 						case 0: dps = 1; break;
-						case 1: dps = 3; snprintf(prefix,sizeof(prefix),"k"); break;
-						case 2: dps = 2; snprintf(prefix,sizeof(prefix),"k"); break;
-						case 3: dps = 1; snprintf(prefix,sizeof(prefix),"k"); break;
-						case 4: dps = 3; snprintf(prefix,sizeof(prefix),"M"); break;
-						case 5: dps = 2; snprintf(prefix,sizeof(prefix),"M"); break;
+						case 1: dps = 3; StringCbPrintf(prefix,sizeof(prefix),L"k"); break;
+						case 2: dps = 2; StringCbPrintf(prefix,sizeof(prefix),L"k"); break;
+						case 3: dps = 1; StringCbPrintf(prefix,sizeof(prefix),L"k"); break;
+						case 4: dps = 3; StringCbPrintf(prefix,sizeof(prefix),L"M"); break;
+						case 5: dps = 2; StringCbPrintf(prefix,sizeof(prefix),L"M"); break;
 					}
 					break; // FUNCTION_OHMS
 
 
 
 				case FUNCTION_CONTINUITY:
-					snprintf(mmmode,sizeof(mmmode),"Continuity");
-					snprintf(units,sizeof(units),"R");
+					StringCbPrintf(mmmode,sizeof(mmmode),L"Continuity");
+					StringCbPrintf(units,sizeof(units),L"\u2126");
 					dps = 1;
 					break; // FUNCTION_CONTINUITY
 
 
 				case FUNCTION_DIODE:
-					snprintf(mmmode,sizeof(mmmode),"DIODE");
-					snprintf(units,sizeof(units),"V");
+					StringCbPrintf(mmmode,sizeof(mmmode),L"DIODE");
+					StringCbPrintf(units,sizeof(units),L"V");
 					dps = 3;
 					break; // FUNCTION_DIODE
 
 
 				case FUNCTION_FQ_RPM:
 					if (d[BYTE_STATUS] & STATUS_JUDGE) {
-						snprintf(mmmode,sizeof(mmmode),"Frequency");
-						snprintf(units,sizeof(units),"Hz");
+						StringCbPrintf(mmmode,sizeof(mmmode),L"Frequency");
+						StringCbPrintf(units,sizeof(units),L"Hz");
 						switch (d[BYTE_RANGE] & 0x0F) {
-							case 0: dps = 3; snprintf(prefix, sizeof(prefix),"k"); break;
-							case 1: dps = 2; snprintf(prefix, sizeof(prefix),"k"); break;
-							case 2: dps = 1; snprintf(prefix, sizeof(prefix),"k"); break;
-							case 3: dps = 3; snprintf(prefix, sizeof(prefix),"M"); break;
-							case 4: dps = 2; snprintf(prefix, sizeof(prefix),"M"); break;
-							case 5: dps = 1; snprintf(prefix, sizeof(prefix),"M"); break;
+							case 0: dps = 3; StringCbPrintf(prefix, sizeof(prefix),L"k"); break;
+							case 1: dps = 2; StringCbPrintf(prefix, sizeof(prefix),L"k"); break;
+							case 2: dps = 1; StringCbPrintf(prefix, sizeof(prefix),L"k"); break;
+							case 3: dps = 3; StringCbPrintf(prefix, sizeof(prefix),L"M"); break;
+							case 4: dps = 2; StringCbPrintf(prefix, sizeof(prefix),L"M"); break;
+							case 5: dps = 1; StringCbPrintf(prefix, sizeof(prefix),L"M"); break;
 						} // switch
 
 					} else {
-						snprintf(mmmode,sizeof(mmmode),"RPM");
-						snprintf(units,sizeof(units),"rpm");
+						StringCbPrintf(mmmode,sizeof(mmmode),L"RPM");
+						StringCbPrintf(units,sizeof(units),L"rpm");
 						switch (d[BYTE_RANGE] & 0x0F) {
-							case 0: dps = 2; snprintf(prefix, sizeof(prefix),"k"); break;
-							case 1: dps = 1; snprintf(prefix, sizeof(prefix),"k"); break;
-							case 2: dps = 3; snprintf(prefix, sizeof(prefix),"M"); break;
-							case 3: dps = 2; snprintf(prefix, sizeof(prefix),"M"); break;
-							case 4: dps = 1; snprintf(prefix, sizeof(prefix),"M"); break;
-							case 5: dps = 0; snprintf(prefix, sizeof(prefix),"M"); break;
+							case 0: dps = 2; StringCbPrintf(prefix, sizeof(prefix),L"k"); break;
+							case 1: dps = 1; StringCbPrintf(prefix, sizeof(prefix),L"k"); break;
+							case 2: dps = 3; StringCbPrintf(prefix, sizeof(prefix),L"M"); break;
+							case 3: dps = 2; StringCbPrintf(prefix, sizeof(prefix),L"M"); break;
+							case 4: dps = 1; StringCbPrintf(prefix, sizeof(prefix),L"M"); break;
+							case 5: dps = 0; StringCbPrintf(prefix, sizeof(prefix),L"M"); break;
 						} // switch
 					}
 					break; // FUNCTION_FQ_RPM
@@ -706,26 +705,26 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 
 				case FUNCTION_CAPACITANCE:
-					snprintf(mmmode,sizeof(mmmode),"Capacitance");
-					snprintf(units,sizeof(units),"F");
+					StringCbPrintf(mmmode,sizeof(mmmode),L"Capacitance");
+					StringCbPrintf(units,sizeof(units),L"F");
 					switch (d[BYTE_RANGE] & 0x0F) {
-						case 0: dps = 3; snprintf(prefix, sizeof(prefix),"n"); break;
-						case 1: dps = 2; snprintf(prefix, sizeof(prefix),"n"); break;
-						case 2: dps = 1; snprintf(prefix, sizeof(prefix),"n"); break;
-						case 3: dps = 3; snprintf(prefix, sizeof(prefix),"μ"); break;
-						case 4: dps = 2; snprintf(prefix, sizeof(prefix),"μ"); break;
-						case 5: dps = 1; snprintf(prefix, sizeof(prefix),"μ"); break;
-						case 6: dps = 3; snprintf(prefix, sizeof(prefix),"m"); break;
-						case 7: dps = 2; snprintf(prefix, sizeof(prefix),"m"); break;
+						case 0: dps = 3; StringCbPrintf(prefix, sizeof(prefix),L"n"); break;
+						case 1: dps = 2; StringCbPrintf(prefix, sizeof(prefix),L"n"); break;
+						case 2: dps = 1; StringCbPrintf(prefix, sizeof(prefix),L"n"); break;
+						case 3: dps = 3; StringCbPrintf(prefix, sizeof(prefix),L"μ"); break;
+						case 4: dps = 2; StringCbPrintf(prefix, sizeof(prefix),L"μ"); break;
+						case 5: dps = 1; StringCbPrintf(prefix, sizeof(prefix),L"μ"); break;
+						case 6: dps = 3; StringCbPrintf(prefix, sizeof(prefix),L"m"); break;
+						case 7: dps = 2; StringCbPrintf(prefix, sizeof(prefix),L"m"); break;
 					}
 					break; // FUNCTION_CAPACITANCE
 
 				case FUNCTION_TEMPERATURE:
-					snprintf(mmmode,sizeof(mmmode),"Temperature");
+					StringCbPrintf(mmmode,sizeof(mmmode),L"Temperature");
 					if (d[BYTE_STATUS] & STATUS_JUDGE) {
-						snprintf(units,sizeof(units),"'C");
+						StringCbPrintf(units,sizeof(units),L"'C");
 					} else {
-						snprintf(units,sizeof(units),"'F");
+						StringCbPrintf(units,sizeof(units),L"'F");
 					}
 					break; // FUNCTION_TEMPERATURE
 
@@ -755,29 +754,28 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 			 */
 			if (g.show_mode == 0) {
 				mmmode[0] = 0;
-				mode_separator[0] = 0;
 			} 
 
 			/** range checks **/
 			if ( (d[BYTE_STATUS] & STATUS_OL) == 1 ) {
-				snprintf(cmd, sizeof(cmd), "O.L." );
+				StringCbPrintf(cmd, sizeof(cmd), L"O.L." );
 
 			} else {
 				if (dps < 0) dps = 0;
 				if (dps > 3) dps = 3;
 
 				switch (dps) {
-					case 0: snprintf(cmd, sizeof(cmd), "% 05.0f%s%s    ",v, prefix, units ); break;
-					case 1: snprintf(cmd, sizeof(cmd), "% 06.1f%s%s    ",v/10, prefix, units ); break;
-					case 2: snprintf(cmd, sizeof(cmd), "% 06.2f%s%s    ",v/100, prefix, units ); break;
-					case 3: snprintf(cmd, sizeof(cmd), "% 06.3f%s%s    ",v/1000, prefix, units ); break;
+					case 0: StringCbPrintf(cmd, sizeof(cmd), L"% 05.0f%s%s    ",v, prefix, units ); break;
+					case 1: StringCbPrintf(cmd, sizeof(cmd), L"% 06.1f%s%s    ",v/10, prefix, units ); break;
+					case 2: StringCbPrintf(cmd, sizeof(cmd), L"% 06.2f%s%s    ",v/100, prefix, units ); break;
+					case 3: StringCbPrintf(cmd, sizeof(cmd), L"% 06.3f%s%s    ",v/1000, prefix, units ); break;
 				}
 			}
 		} // if com-read status == TRUE
 
 		if (newcmd == 0) {
 			newcmd = 1;
-			snprintf(cmd2, sizeof(cmd2),"%-60s", mmmode);
+			StringCbPrintf(cmd2, sizeof(cmd2),L"%-60s", mmmode);
 			InvalidateRect(hstatic,  NULL, FALSE);
 			newcmd = 0;
 		}
@@ -819,15 +817,15 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
 			SetTextColor(hdc, glbs->font_color);
 			holdFont = SelectObject(hdc, hFont );
 			GetTextMetrics(hdc, &fontmetrics);
-			TextOutA(hdc, 0, 0, cmd, strlen(cmd));
+			TextOutW(hdc, 0, 0, cmd, wcslen(cmd));
 
 //    float ratio = pTextFormat->GetFontSize() / (float)metrics.designUnitsPerEm;
   //  float size = (metrics.ascent + metrics.descent + metrics.lineGap) * ratio;
     //float height = GetHeight();
 
 			holdFont = SelectObject(hdc, hFontBg );
-			//TextOutA(hdc, fontmetrics.tmInternalLeading, (glbs->font_size *1.05) -fontmetrics.tmDescent , cmd2, strlen(cmd2));
-			TextOutA(hdc, 0, (glbs->font_size *1.05) -fontmetrics.tmDescent , cmd2, strlen(cmd2));
+			//TextOutA(hdc, fontmetrics.tmInternalLeading, (glbs->font_size *1.05) -fontmetrics.tmDescent , cmd2, wcslen(cmd2));
+			TextOutW(hdc, 0, (glbs->font_size *1.05) -fontmetrics.tmDescent , cmd2, wcslen(cmd2));
 			EndPaint(hwnd, &ps);
 
 			newcmd = 0;
