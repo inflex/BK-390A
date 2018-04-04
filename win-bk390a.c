@@ -42,7 +42,10 @@ char help[] = " -p <comport#> [-s <serial port config>] [-m] [-d] [-q]\r\n"\
 			   "\t\tv0.1Alpha / January 27, 2018\r\n"\
 			   "\r\n"\
 			   "\t-h: This help\r\n"\
-			   "\t-z: Font size (default 48)\r\n"\
+			   "\t-z: Font size (default 48, max 256pt)\r\n"\
+			   "\t-fc <#rrggbb>: Font colour\r\n"\
+			   "\t-bc <#rrggbb>: Background colour\r\n"\
+			   "\r\n"\
 			   "\t-p <comport>: Set the com port for the meter, eg: -p 2\r\n"\
 			   "\t-s <[9600|4800|2400|1200]:[7|8][o|e|n][1|2]>, eg: -s 2400:7o1\r\n"\
 			   "\t-d: debug enabled\r\n"\
@@ -92,6 +95,7 @@ char help[] = " -p <comport#> [-s <serial port config>] [-m] [-d] [-q]\r\n"\
 #define OPTION2_DC			0x08
 
 struct glb {
+	int window_x, window_y;
 	uint8_t debug;
 	uint8_t comms_enabled;
 	uint8_t quiet;
@@ -99,6 +103,9 @@ struct glb {
 	uint16_t flags;
 	uint8_t com_address;
 	int font_size;
+	int font_weight;
+
+	COLORREF font_color, background_color;
 
 	char serial_params[1024];
 };
@@ -107,12 +114,16 @@ struct glb {
  * We have our file handles as globals only so that
  * we can cleanly close them atexit()
  */
-HFONT hFont;
+HFONT hFont, hFontBg;
 HANDLE hComm;			// Handle to the serial port
 HWND hstatic;
 char cmd[1024];
+char cmd2[1024];
+char mmmode[1024];
 int tick = 0;
 int newcmd = 0;
+struct glb *glbs;
+TEXTMETRIC fontmetrics;
 
 /*-----------------------------------------------------------------\
   Date Code:	: 20180127-220248
@@ -131,13 +142,19 @@ Changes:
 
 \------------------------------------------------------------------*/
 int init( struct glb *g ) {
+	g->window_x = 450;
+	g->window_y = 250;
 	g->debug = 0;
 	g->comms_enabled = 1;
 	g->quiet = 0;
 	g->show_mode = 0;
 	g->flags = 0;
-	g->font_size = 48;
-	g->com_address = 0;
+	g->font_size = 72;
+	g->font_weight = 600;
+	g->com_address = 99;
+
+	g->font_color = RGB(0,0,0);
+	g->background_color = GetSysColor(COLOR_BTNFACE);
 
 	g->serial_params[0] = '\0';
 
@@ -186,11 +203,45 @@ int parse_parameters( struct glb *g ) {
 					exit(1);
 					break;
 
+				case 'w':
+					if (argv[i][2] == 'x') {
+						i++;
+						g->window_x = _wtoi(argv[i]);
+					} else if (argv[i][2] == 'y') {
+						i++;
+						g->window_y = _wtoi(argv[i]);
+					}
+					break;
+
+				case 'b':
+					if (argv[i][2] == 'c') {
+						int r, gg, b;
+
+						i++;
+						swscanf(argv[i], L"#%02x%02x%02x", &r, &gg, &b);
+						g->background_color = RGB(r,gg,b);
+					}
+					break;
+
+				case 'f':
+					if (argv[i][2] == 'w') {
+						i++;
+						g->font_weight = _wtoi(argv[i]);
+
+					} else if (argv[i][2] == 'c') {
+						int r, gg, b;
+
+						i++;
+						swscanf(argv[i], L"#%02x%02x%02x", &r, &gg, &b);
+						g->font_color = RGB(r,gg,b);
+					}
+					break;
+
 				case 'z':
 					i++;
 					if (i < argc) fz = _wtoi(argv[i]);
 					if (fz < 10) fz = 10;
-					if (fz > 144) fz = 144;
+					if (fz > 256) fz = 256;
 					g->font_size = fz;
 					break;
 
@@ -272,7 +323,6 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		PWSTR lpCmdLine, int nCmdShow) {
 
 
-	char mmode[128];		// String describing multimeter mode (volts, amps etc)
 	char mode_separator[] = "\r\n  ";
 	char prefix[128];		// Units prefix u, m, k, M etc 
 	char units[128];		// Measurement units F, V, A, R
@@ -280,6 +330,8 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	uint8_t dps = 0;		// Number of decimal places
 	struct glb g;			// Global structure for passing variables around
 	int i = 0;				// Generic counter
+
+	glbs = &g;
 
 	MSG  msg ;
 	WNDCLASSW wc = {0};
@@ -291,10 +343,9 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	DWORD bytes_read;       // Number of bytes read by ReadFile()
 
 	cmd[0] = '\0';
+	cmd2[0] = '\0';
 
 
-#define IDM_FILE_PARAMETERS 1
-#define IDM_FILE_QUIT 2
 
 	/* 
 	 * Initialise the global structure
@@ -310,7 +361,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	/*
 	 * Sanity check our parameters
 	 */
-	if (g.com_address == NULL) {
+	if (g.com_address == 99) {
 
 		snwprintf( com_port, sizeof(com_port), L"\\\\.\\COM%s", "2" );
 		//		fprintf(stderr, "Require com port address for BK-390A meter, ie, -p 2\r\n");
@@ -460,13 +511,22 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	RegisterClassW(&wc);
 	hstatic = CreateWindowW(wc.lpszClassName, L"BK390-A Meter",
 			WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-			100, 100, 390, 350, NULL, NULL, hInstance, NULL);
+			100, 100, 100+g.window_x, 100+g.window_y, NULL, NULL, hInstance, NULL);
 
 	/* Make the window visible on the screen */
 	//ShowWindow (hwnd, nCmdShow);
 
-	hFont = CreateFont(g.font_size,0,0,0,FW_DONTCARE,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_OUTLINE_PRECIS,
-			CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY, VARIABLE_PITCH,TEXT("Impact"));
+	hFont = CreateFont(g.font_size,0,0,0,g.font_weight,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_OUTLINE_PRECIS,
+			CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY, FIXED_PITCH,TEXT("Andale"));
+//			CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY, FIXED_PITCH,TEXT("Monotype"));
+
+	hFontBg = CreateFont(g.font_size /4 , 0,0,0,FW_DONTCARE,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_OUTLINE_PRECIS,
+			CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY, FIXED_PITCH,TEXT("Andale"));
+//			CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY, FIXED_PITCH,TEXT("Monotype"));
+
+		units[0] = '\0';
+		prefix[0] = '\0';
+		mmmode[0] = '\0';
 
 	/*
 	 * Keep reading, interpreting and converting data until someone
@@ -477,9 +537,6 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		double v = 0.0;
 		int end_of_frame_received = 0;
 
-		units[0] = '\0';
-		prefix[0] = '\0';
-		mmode[0] = '\0';
 
 		/* 
 		 *
@@ -506,7 +563,8 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); //Wait for the character to be received
 		if (com_read_status == FALSE) {
 			//			fprintf(stderr,"Error in WaitCommEvent()\r\n");
-			snprintf(cmd,sizeof(cmd),"No connect %d  ", ((tick++)%1000));			
+			snprintf(cmd,sizeof(cmd),"N/C");			
+			snprintf(mmmode,sizeof(mmmode),"Check RS232");
 
 		} else {
 			/*
@@ -544,7 +602,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 				case FUNCTION_VOLTAGE: 
 					snprintf(units,sizeof(units),"V");
-					snprintf(mmode,sizeof(mmode),"Volts");
+					snprintf(mmmode,sizeof(mmmode),"Volts");
 
 					switch (d[BYTE_RANGE] & 0x0F) {
 						case 0: dps = 1; snprintf(prefix, sizeof(prefix), "m"); break;
@@ -559,7 +617,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 				case FUNCTION_CURRENT_UA:
 					snprintf(units,sizeof(units),"A");
 					snprintf(prefix,sizeof(prefix),"m");
-					snprintf(mmode,sizeof(mmode),"Amps");
+					snprintf(mmmode,sizeof(mmmode),"Amps");
 
 					switch (d[BYTE_RANGE] & 0x0F) {
 						case 0: dps = 2; break;
@@ -572,7 +630,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 				case FUNCTION_CURRENT_MA:
 					snprintf(units,sizeof(units),"A");
 					snprintf(prefix,sizeof(prefix),"μ");
-					snprintf(mmode,sizeof(mmode),"Amps");
+					snprintf(mmmode,sizeof(mmmode),"Amps");
 
 					switch (d[BYTE_RANGE] & 0x0F) {
 						case 0: dps = 1; break;
@@ -583,14 +641,14 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 				case FUNCTION_CURRENT_A:
 					snprintf(units,sizeof(units),"A");
-					snprintf(mmode,sizeof(mmode),"Amps");
+					snprintf(mmmode,sizeof(mmmode),"Amps");
 					break; // FUNCTION_CURRENT_A
 
 
 
 				case FUNCTION_OHMS:
-					snprintf(mmode,sizeof(mmode),"Resistance");
-					snprintf(units,sizeof(units),"Ω");
+					snprintf(mmmode,sizeof(mmmode),"Resistance");
+					snprintf(units,sizeof(units),"R");
 
 					switch (d[BYTE_RANGE] & 0x0F) {
 						case 0: dps = 1; break;
@@ -605,22 +663,22 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 
 				case FUNCTION_CONTINUITY:
-					snprintf(mmode,sizeof(mmode),"Continuity");
-					snprintf(units,sizeof(units),"Ω");
+					snprintf(mmmode,sizeof(mmmode),"Continuity");
+					snprintf(units,sizeof(units),"R");
 					dps = 1;
 					break; // FUNCTION_CONTINUITY
 
 
 				case FUNCTION_DIODE:
-					snprintf(mmode,sizeof(mmode),"Diode");
+					snprintf(mmmode,sizeof(mmmode),"DIODE");
 					snprintf(units,sizeof(units),"V");
-					dps = 1;
+					dps = 3;
 					break; // FUNCTION_DIODE
 
 
 				case FUNCTION_FQ_RPM:
 					if (d[BYTE_STATUS] & STATUS_JUDGE) {
-						snprintf(mmode,sizeof(mmode),"Frequency");
+						snprintf(mmmode,sizeof(mmmode),"Frequency");
 						snprintf(units,sizeof(units),"Hz");
 						switch (d[BYTE_RANGE] & 0x0F) {
 							case 0: dps = 3; snprintf(prefix, sizeof(prefix),"k"); break;
@@ -632,7 +690,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 						} // switch
 
 					} else {
-						snprintf(mmode,sizeof(mmode),"RPM");
+						snprintf(mmmode,sizeof(mmmode),"RPM");
 						snprintf(units,sizeof(units),"rpm");
 						switch (d[BYTE_RANGE] & 0x0F) {
 							case 0: dps = 2; snprintf(prefix, sizeof(prefix),"k"); break;
@@ -648,7 +706,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 
 				case FUNCTION_CAPACITANCE:
-					snprintf(mmode,sizeof(mmode),"Capacitance");
+					snprintf(mmmode,sizeof(mmmode),"Capacitance");
 					snprintf(units,sizeof(units),"F");
 					switch (d[BYTE_RANGE] & 0x0F) {
 						case 0: dps = 3; snprintf(prefix, sizeof(prefix),"n"); break;
@@ -663,7 +721,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 					break; // FUNCTION_CAPACITANCE
 
 				case FUNCTION_TEMPERATURE:
-					snprintf(mmode,sizeof(mmode),"Temperature");
+					snprintf(mmmode,sizeof(mmmode),"Temperature");
 					if (d[BYTE_STATUS] & STATUS_JUDGE) {
 						snprintf(units,sizeof(units),"'C");
 					} else {
@@ -677,7 +735,6 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 			/*
 			 * Decode the digit data in to human-readable 
 			 *
-			 * first byte is the sign +/-
 			 * bytes 1..4 are ASCII char codes for 0000-9999
 			 *
 			 */
@@ -687,11 +744,17 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 				+((d[4] & 0x0F ) *1);
 
 			/*
+			 * Sign of output (+/-)
+			 */
+			if ( d[BYTE_STATUS] & STATUS_SIGN ) v = -v;
+
+
+			/*
 			 * If we're not showing the meter mode, then just
 			 * zero the string we generated previously
 			 */
 			if (g.show_mode == 0) {
-				mmode[0] = 0;
+				mmmode[0] = 0;
 				mode_separator[0] = 0;
 			} 
 
@@ -704,19 +767,18 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 				if (dps > 3) dps = 3;
 
 				switch (dps) {
-					case 0: snprintf(cmd, sizeof(cmd), "% 05.0f%s%s  %s%s",v, prefix, units, mode_separator, mmode ); break;
-					case 1: snprintf(cmd, sizeof(cmd), "% 06.1f%s%s  %s%s",v/10, prefix, units, mode_separator, mmode ); break;
-					case 2: snprintf(cmd, sizeof(cmd), "% 06.2f%s%s  %s%s",v/100, prefix, units, mode_separator, mmode ); break;
-					case 3: snprintf(cmd, sizeof(cmd), "% 06.3f%s%s  %s%s",v/1000, prefix, units, mode_separator, mmode ); break;
+					case 0: snprintf(cmd, sizeof(cmd), "% 05.0f%s%s    ",v, prefix, units ); break;
+					case 1: snprintf(cmd, sizeof(cmd), "% 06.1f%s%s    ",v/10, prefix, units ); break;
+					case 2: snprintf(cmd, sizeof(cmd), "% 06.2f%s%s    ",v/100, prefix, units ); break;
+					case 3: snprintf(cmd, sizeof(cmd), "% 06.3f%s%s    ",v/1000, prefix, units ); break;
 				}
 			}
 		} // if com-read status == TRUE
 
 		if (newcmd == 0) {
 			newcmd = 1;
+			snprintf(cmd2, sizeof(cmd2),"%-60s", mmmode);
 			InvalidateRect(hstatic,  NULL, FALSE);
-			//usleep(250000UL);
-			//			SendMessage(hstatic, WM_USER+11, 1, 2);
 			newcmd = 0;
 		}
 
@@ -729,6 +791,10 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 }
 
 
+#define IDM_FONT_COLOUR 1
+#define IDM_BG_COLOUR 2
+#define IDM_FILE_PARAMETERS 3
+#define IDM_FILE_QUIT 4
 
 
 /*  This function is called by the Windows function DispatchMessage()  */
@@ -738,7 +804,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
 	switch (message)                  /* handle the messages */
 	{
 		case WM_CREATE:
-			//			AddMenus(hwnd);
+			//AddMenus(hwnd);
 			break;
 
 		case WM_PAINT:
@@ -749,14 +815,21 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
 
 			hdc = BeginPaint(hwnd, &ps);
 			color = GetSysColor(COLOR_BTNFACE);
-			SetBkColor(hdc, color);
-			SetTextColor(hdc, RGB(0,0,0));
-
+			SetBkColor(hdc, glbs->background_color);
+			SetTextColor(hdc, glbs->font_color);
 			holdFont = SelectObject(hdc, hFont );
-			TextOutA(hdc, 5, 5, cmd, strlen(cmd));
-			SelectObject(hdc, holdFont);
+			GetTextMetrics(hdc, &fontmetrics);
+			TextOutA(hdc, 0, 0, cmd, strlen(cmd));
+
+//    float ratio = pTextFormat->GetFontSize() / (float)metrics.designUnitsPerEm;
+  //  float size = (metrics.ascent + metrics.descent + metrics.lineGap) * ratio;
+    //float height = GetHeight();
+
+			holdFont = SelectObject(hdc, hFontBg );
+			//TextOutA(hdc, fontmetrics.tmInternalLeading, (glbs->font_size *1.05) -fontmetrics.tmDescent , cmd2, strlen(cmd2));
+			TextOutA(hdc, 0, (glbs->font_size *1.05) -fontmetrics.tmDescent , cmd2, strlen(cmd2));
 			EndPaint(hwnd, &ps);
-			//			fprintf(stderr,"%s\n",cmd);
+
 			newcmd = 0;
 			break;
 
@@ -790,7 +863,8 @@ void AddMenus(HWND hwnd) {
 	hMenubar = CreateMenu();
 	hMenu = CreateMenu();
 
-	AppendMenuW(hMenu, MF_STRING, IDM_FILE_PARAMETERS, L"&Parameters");
+	AppendMenuW(hMenu, MF_STRING, IDM_FONT_COLOUR, L"&Font");
+	AppendMenuW(hMenu, MF_STRING, IDM_BG_COLOUR, L"&Background");
 	AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
 	AppendMenuW(hMenu, MF_STRING, IDM_FILE_QUIT, L"&Quit");
 
