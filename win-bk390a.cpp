@@ -590,22 +590,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
             StringCbPrintf(mmmode, sizeof(mmmode), L"Volts");
 
             switch (d[BYTE_RANGE] & 0x0F) {
-            case 0:
-               dps = 1;
-               StringCbPrintf(prefix, sizeof(prefix), L"m");
-               break;
-            case 1:
-               dps = 3;
-               break;
-            case 2:
-               dps = 2;
-               break;
-            case 3:
-               dps = 1;
-               break;
-            case 4:
-               dps = 0;
-               break;
+            case 0: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"m"); break;
+            case 1: dps = 3; break;
+            case 2: dps = 2; break;
+            case 3: dps = 1; break;
+            case 4: dps = 0; break;
             }      // test the range byte for voltages
             break; // FUNCTION_VOLTAGE
 
@@ -615,12 +604,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
             StringCbPrintf(mmmode, sizeof(mmmode), L"Amps");
 
             switch (d[BYTE_RANGE] & 0x0F) {
-            case 0:
-               dps = 2;
-               break;
-            case 1:
-               dps = 1;
-               break;
+            case 0: dps = 2; break;
+            case 1: dps = 1; break;
             }
             break; // FUNCTION_CURRENT_UA
 
@@ -630,12 +615,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
             StringCbPrintf(mmmode, sizeof(mmmode), L"Amps");
 
             switch (d[BYTE_RANGE] & 0x0F) {
-            case 0:
-               dps = 1;
-               break;
-            case 1:
-               dps = 0;
-               break;
+            case 0: dps = 1; break;
+            case 1: dps = 0; break;
             }
             break; // FUNCTION_CURRENT_MA
 
@@ -649,29 +630,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
             StringCbPrintf(units, sizeof(units), L"\u2126");
 
             switch (d[BYTE_RANGE] & 0x0F) {
-            case 0:
-               dps = 1;
-               break;
-            case 1:
-               dps = 3;
-               StringCbPrintf(prefix, sizeof(prefix), L"k");
-               break;
-            case 2:
-               dps = 2;
-               StringCbPrintf(prefix, sizeof(prefix), L"k");
-               break;
-            case 3:
-               dps = 1;
-               StringCbPrintf(prefix, sizeof(prefix), L"k");
-               break;
-            case 4:
-               dps = 3;
-               StringCbPrintf(prefix, sizeof(prefix), L"M");
-               break;
-            case 5:
-               dps = 2;
-               StringCbPrintf(prefix, sizeof(prefix), L"M");
-               break;
+            case 0: dps = 1; break;
+            case 1: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+            case 2: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+            case 3: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+            case 4: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+            case 5: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
             }
             break; // FUNCTION_OHMS
 
@@ -692,60 +656,24 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
                StringCbPrintf(mmmode, sizeof(mmmode), L"Frequency");
                StringCbPrintf(units, sizeof(units), L"Hz");
                switch (d[BYTE_RANGE] & 0x0F) {
-               case 0:
-                  dps = 3;
-                  StringCbPrintf(prefix, sizeof(prefix), L"k");
-                  break;
-               case 1:
-                  dps = 2;
-                  StringCbPrintf(prefix, sizeof(prefix), L"k");
-                  break;
-               case 2:
-                  dps = 1;
-                  StringCbPrintf(prefix, sizeof(prefix), L"k");
-                  break;
-               case 3:
-                  dps = 3;
-                  StringCbPrintf(prefix, sizeof(prefix), L"M");
-                  break;
-               case 4:
-                  dps = 2;
-                  StringCbPrintf(prefix, sizeof(prefix), L"M");
-                  break;
-               case 5:
-                  dps = 1;
-                  StringCbPrintf(prefix, sizeof(prefix), L"M");
-                  break;
+               case 0: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+               case 1: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+               case 2: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+               case 3: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+               case 4: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+               case 5: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
                } // switch
 
             } else {
                StringCbPrintf(mmmode, sizeof(mmmode), L"RPM");
                StringCbPrintf(units, sizeof(units), L"rpm");
                switch (d[BYTE_RANGE] & 0x0F) {
-               case 0:
-                  dps = 2;
-                  StringCbPrintf(prefix, sizeof(prefix), L"k");
-                  break;
-               case 1:
-                  dps = 1;
-                  StringCbPrintf(prefix, sizeof(prefix), L"k");
-                  break;
-               case 2:
-                  dps = 3;
-                  StringCbPrintf(prefix, sizeof(prefix), L"M");
-                  break;
-               case 3:
-                  dps = 2;
-                  StringCbPrintf(prefix, sizeof(prefix), L"M");
-                  break;
-               case 4:
-                  dps = 1;
-                  StringCbPrintf(prefix, sizeof(prefix), L"M");
-                  break;
-               case 5:
-                  dps = 0;
-                  StringCbPrintf(prefix, sizeof(prefix), L"M");
-                  break;
+               case 0: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+               case 1: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+               case 2: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+               case 3: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+               case 4: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+               case 5: dps = 0; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
                } // switch
             }
             break; // FUNCTION_FQ_RPM
@@ -754,38 +682,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
             StringCbPrintf(mmmode, sizeof(mmmode), L"Capacitance");
             StringCbPrintf(units, sizeof(units), L"F");
             switch (d[BYTE_RANGE] & 0x0F) {
-            case 0:
-               dps = 3;
-               StringCbPrintf(prefix, sizeof(prefix), L"n");
-               break;
-            case 1:
-               dps = 2;
-               StringCbPrintf(prefix, sizeof(prefix), L"n");
-               break;
-            case 2:
-               dps = 1;
-               StringCbPrintf(prefix, sizeof(prefix), L"n");
-               break;
-            case 3:
-               dps = 3;
-               StringCbPrintf(prefix, sizeof(prefix), L"\u00B5");
-               break;
-            case 4:
-               dps = 2;
-               StringCbPrintf(prefix, sizeof(prefix), L"\u00B5");
-               break;
-            case 5:
-               dps = 1;
-               StringCbPrintf(prefix, sizeof(prefix), L"\u00B5");
-               break;
-            case 6:
-               dps = 3;
-               StringCbPrintf(prefix, sizeof(prefix), L"m");
-               break;
-            case 7:
-               dps = 2;
-               StringCbPrintf(prefix, sizeof(prefix), L"m");
-               break;
+            case 0: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"n"); break;
+            case 1: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"n"); break;
+            case 2: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"n"); break;
+            case 3: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"\u00B5"); break;
+            case 4: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"\u00B5"); break;
+            case 5: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"\u00B5"); break;
+            case 6: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"m"); break;
+            case 7: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"m"); break;
             }
             break; // FUNCTION_CAPACITANCE
 
@@ -832,18 +736,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
                dps = 3;
 
             switch (dps) {
-            case 0:
-               StringCbPrintf(cmd, sizeof(cmd), L"% 05.0f%s%s    ", v, prefix, units);
-               break;
-            case 1:
-               StringCbPrintf(cmd, sizeof(cmd), L"% 06.1f%s%s    ", v / 10, prefix, units);
-               break;
-            case 2:
-               StringCbPrintf(cmd, sizeof(cmd), L"% 06.2f%s%s    ", v / 100, prefix, units);
-               break;
-            case 3:
-               StringCbPrintf(cmd, sizeof(cmd), L"% 06.3f%s%s    ", v / 1000, prefix, units);
-               break;
+            case 0: StringCbPrintf(cmd, sizeof(cmd), L"% 05.0f%s%s    ", v, prefix, units); break;
+            case 1: StringCbPrintf(cmd, sizeof(cmd), L"% 06.1f%s%s    ", v / 10, prefix, units); break;
+            case 2: StringCbPrintf(cmd, sizeof(cmd), L"% 06.2f%s%s    ", v / 100, prefix, units); break;
+            case 3: StringCbPrintf(cmd, sizeof(cmd), L"% 06.3f%s%s    ", v / 1000, prefix, units); break;
             }
          }
       } // if com-read status == TRUE
