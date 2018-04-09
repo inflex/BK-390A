@@ -521,9 +521,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 
 	hstatic = CreateWindowW(wc.lpszClassName, L"BK-390A Meter", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 50, 50, g.window_x, g.window_y, NULL, NULL, hInstance, NULL);
 
-	units[0] = '\0';
-	prefix[0] = '\0';
-	mmmode[0] = '\0';
 
 	/*
 	 * Keep reading, interpreting and converting data until someone
@@ -533,6 +530,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 		char *p, *q;
 		double v = 0.0;
 		int end_of_frame_received = 0;
+
 
 		/*
 		 *
@@ -589,6 +587,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			} while ((bytes_read > 0) && (i < sizeof(d)));
 
 			if (g.debug) fprintf(stdout, ":END\r\n");
+
+			/*
+			 * Initialise the strings used for units, prefix and mode
+			 * so we don't end up with uncleared prefixes etc
+			 * ( see https://www.youtube.com/watch?v=5HUyEykicEQ )
+			 */
+			units[0] = '\0';
+			prefix[0] = '\0';
+			mmmode[0] = '\0';
 
 			/*
 			 * Decode our data.
