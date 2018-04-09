@@ -9,11 +9,15 @@ WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32
 WINCC=i686-w64-mingw32-g++
 # -fpermissive is needed to stop the warnings about casting stoppping the build
 # -municode eliminates the WinMain@16 link error when we're using wWinMain
-WINFLAGS=-fpermissive -municode -static-libgcc -static-libstdc++
+WINFLAGS=-fpermissive -municode -static-libgcc -fpermissive -static-libstdc++
 
 OBJ=bk390a
 OFILES=
-default: bk390a
+default: 
+	@echo
+	@echo "   For OBS command line tool: make bk390a"
+	@echo "   For GUI tool: make win-bk390a"
+	@echo
 
 .c.o:
 	${CC} ${CFLAGS} $(COMPONENTS) -c $*.c
@@ -29,6 +33,9 @@ bk390a: ${OFILES} bk390a.c
 #	ctags *.[ch]
 #	clear
 	${CC} ${CFLAGS} $(COMPONENTS) bk390a.c ${OFILES} -o bk390a ${LIBS}
+
+strip: win-bk390a.exe
+	strip win-bk390a.exe
 
 install: ${OBJ}
 	cp bk390a ${LOCATION}/bin/
