@@ -21,32 +21,31 @@
 #include <unistd.h>
 #include <wchar.h>
 
-char VERSION[] = "v0.3 Beta";
-char help[] = " -p <comport#> [-s <serial port config>] [-m] [-d] [-q]\r\n"
-"\n"
-"\t\tBK-Precision 390A Multimeter serial data decoder\r\n"
+char VERSION[] = "v0.4 Beta";
+char help[] = "BK-Precision 390A Multimeter serial data decoder\r\n"
+"By Paul L Daniels / pldaniels@gmail.com\r\n"
+"v0.4 BETA / April 11, 2018\r\n"
 "\r\n"
-"\t\tBy Paul L Daniels / pldaniels@gmail.com\r\n"
-"\t\tv0.3 BETA / April 9, 2018\r\n"
+" -p <comport#> [-s <serial port config>] [-m] [-fn <fontname>] [-fc <#rrggbb>] [-fw <weight>] [-bc <#rrggbb>] [-wx <width>] [-wy <height>] [-d] [-q]\r\n"
 "\r\n"
 "\t-h: This help\r\n"
+"\t-p <comport>: Set the com port for the meter, eg: -p 2\r\n"
+"\t-s <[9600|4800|2400|1200]:[7|8][o|e|n][1|2]>, eg: -s 2400:7o1\r\n"
+"\t-m: show multimeter mode (second line of text)\r\n"
 "\t-z: Font size (default 72, max 256pt)\r\n"
 "\t-fn <font name>: Font name (default 'Andale')\r\n"
 "\t-fc <#rrggbb>: Font colour\r\n"
 "\t-bc <#rrggbb>: Background colour\r\n"
-"\t-fw <weight>: Font weight, typically 100, 500, 600, or 700 values\r\n"
-"\r\n"
-"\t-wx <width>: Window width\r\n"
-"\t-wy <height>: Window height\r\n"
-"\r\n"
-"\t-p <comport>: Set the com port for the meter, eg: -p 2\r\n"
-"\t-s <[9600|4800|2400|1200]:[7|8][o|e|n][1|2]>, eg: -s 2400:7o1\r\n"
+"\t-fw <weight>: Font weight, typically 100-to-900 range\r\n"
+"\t-wx <width>: Force Window width (normally calculated based on font size)\r\n"
+"\t-wy <height>: Force Window height\r\n"
 "\t-d: debug enabled\r\n"
-"\t-m: show multimeter mode\r\n"
 "\t-q: quiet output\r\n"
 "\t-v: show version\r\n"
-"\n\n\texample: bk390a.exe -z 120 -p 4 -s 2400:7o1 -m -fc #10ff10 -bc #000000 -wx 480 -wy 60 -fw 600\r\n"
-"\r\n";
+"\r\n"
+"\tDefaults: -s 2400:7o1 -z 72 -fc #10ff10 -bc #000000 -fw 600\r\n"
+"\r\n"
+"\texample: bk390a.exe -z 120 -p 4 -s 2400:7o1 -m -fc #10ff10 -bc #000000 -wx 480 -wy 60 -fw 600\r\n";
 
 #define BYTE_RANGE 0
 #define BYTE_DIGIT_3 1
@@ -87,7 +86,18 @@ char help[] = " -p <comport#> [-s <serial port config>] [-m] [-d] [-q]\r\n"
 #define OPTION2_AC 0x04
 #define OPTION2_DC 0x08
 
+#define WINDOWS_DPI_DEFAULT 72
 #define FONT_NAME_SIZE 1024
+#define SSIZE 1024
+
+#define FONT_SIZE_MAX 256
+#define FONT_SIZE_MIN 10
+#define DEFAULT_FONT_SIZE 72
+#define DEFAULT_FONT L"Andale"
+#define DEFAULT_FONT_WEIGHT 600
+#define DEFAULT_WINDOW_HEIGHT 9999
+#define DEFAULT_WINDOW_WIDTH 9999
+#define DEFAULT_COM_PORT 99
 
 struct glb {
 	int window_x, window_y;
@@ -104,11 +114,11 @@ struct glb {
 
 	COLORREF font_color, background_color;
 
-	char serial_params[1024];
+	char serial_params[SSIZE];
 };
 
 /*
- * A whole bunch of globals, becuase I need
+ * A whole bunch of globals, because I need
  * them accessible in the Windows handler
  *
  * So many of these I'd like to try get away from being
@@ -122,9 +132,8 @@ HWND hstatic;
 HBRUSH BBrush; // = CreateSolidBrush(RGB(0,0,0));
 TEXTMETRIC fontmetrics, smallfontmetrics;
 
-wchar_t cmd[1024];
-wchar_t cmd2[1024];
-wchar_t mmmode[1024];
+wchar_t line1[SSIZE];
+wchar_t line2[SSIZE];
 struct glb *glbs;
 
 /*-----------------------------------------------------------------\
@@ -144,18 +153,18 @@ Changes:
 
 \------------------------------------------------------------------*/
 int init(struct glb *g) {
-	g->window_x = 9999;
-	g->window_y = 9999;
+	g->window_x = DEFAULT_WINDOW_WIDTH;
+	g->window_y = DEFAULT_WINDOW_HEIGHT;
 	g->debug = 0;
 	g->comms_enabled = 1;
 	g->quiet = 0;
 	g->show_mode = 0;
 	g->flags = 0;
-	g->font_size = 72;
-	g->font_weight = 600;
-	g->com_address = 99;
+	g->font_size = DEFAULT_FONT_SIZE;
+	g->font_weight = DEFAULT_FONT_WEIGHT;
+	g->com_address = DEFAULT_COM_PORT;
 
-	StringCbPrintfW(g->font_name, FONT_NAME_SIZE, L"Andale");
+	StringCbPrintfW(g->font_name, FONT_NAME_SIZE, DEFAULT_FONT);
 	g->font_color = RGB(16, 255, 16);
 	g->background_color = RGB(0, 0, 0);
 
@@ -186,11 +195,16 @@ int parse_parameters(struct glb *g) {
 	LPWSTR *argv;
 	int argc;
 	int i;
-	int fz = 48;
+	int fz = DEFAULT_FONT_SIZE;
 
 	argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 	if (NULL == argv) {
 		return 0;
+	}
+
+	if (argc ==1) {
+		wprintf(L"Usage: %s", help);
+		exit(1);
 	}
 
 	for (i = 0; i < argc; i++) {
@@ -198,7 +212,7 @@ int parse_parameters(struct glb *g) {
 			/* parameter */
 			switch (argv[i][1]) {
 				case 'h':
-					fprintf(stdout, "Usage: %s %s", argv[0], help);
+					wprintf(L"Usage: %s", help);
 					exit(1);
 					break;
 
@@ -242,13 +256,15 @@ int parse_parameters(struct glb *g) {
 
 				case 'z':
 					i++;
-					if (i < argc)
+					if (i < argc) {
 						fz = _wtoi(argv[i]);
-					if (fz < 10)
-						fz = 10;
-					if (fz > 256)
-						fz = 256;
-					g->font_size = fz;
+						if (fz < FONT_SIZE_MIN) {
+							fz = FONT_SIZE_MIN;
+						} else if (fz > FONT_SIZE_MAX) {
+							fz = FONT_SIZE_MAX;
+						}
+						g->font_size = fz;
+					}
 					break;
 
 				case 'p':
@@ -256,7 +272,7 @@ int parse_parameters(struct glb *g) {
 					if (i < argc) {
 						g->com_address = _wtoi(argv[i]);
 					} else {
-						fprintf(stderr, "Insufficient parameters; -p <com port>\n");
+						wprintf(L"Insufficient parameters; -p <com port>\n");
 						exit(1);
 					}
 					break;
@@ -270,7 +286,7 @@ int parse_parameters(struct glb *g) {
 				case 'm': g->show_mode = 1; break;
 
 				case 'v':
-							 fprintf(stdout, "%s\r\n", VERSION);
+							 wprintf(L"%s\r\n", VERSION);
 							 exit(0);
 							 break;
 
@@ -279,7 +295,7 @@ int parse_parameters(struct glb *g) {
 							 if (i < argc)
 								 wcstombs(g->serial_params, argv[i], sizeof(g->serial_params));
 							 else {
-								 fprintf(stderr, "Insufficient parameters; -s <parameters> [eg 9600:8:o:1] = 9600, 8-bit, odd, 1-stop\n");
+								 wprintf(L"Insufficient parameters; -s <parameters> [eg 9600:8:o:1] = 9600, 8-bit, odd, 1-stop\n");
 								 exit(1);
 							 }
 							 break;
@@ -317,15 +333,18 @@ Changes:
 
 \------------------------------------------------------------------*/
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLine, int nCmdShow) {
-	wchar_t prefix[128]; // Units prefix u, m, k, M etc
-	wchar_t units[128];  // Measurement units F, V, A, R
-	uint8_t d[256];      // Serial data packet
+	wchar_t linetmp[SSIZE]; // temporary string for building main line of text
+	wchar_t prefix[SSIZE]; // Units prefix u, m, k, M etc
+	wchar_t units[SSIZE];  // Measurement units F, V, A, R
+	wchar_t mmmode[SSIZE]; // Multimeter mode, Resistance/diode/cap etc
+
+	uint8_t d[SSIZE];      // Serial data packet
 	uint8_t dps = 0;     // Number of decimal places
 	struct glb g;        // Global structure for passing variables around
 	int i = 0;           // Generic counter
 	MSG msg;
 	WNDCLASSW wc = {0};
-	wchar_t com_port[256]; // com port path / ie, \\.COM4
+	wchar_t com_port[SSIZE]; // com port path / ie, \\.COM4
 	BOOL com_read_status;  // return status of various com port functions
 	DWORD dwEventMask;     // Event mask to trigger
 	char temp_char;        // Temporary character
@@ -333,9 +352,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 	HDC dc;
 
 	glbs = &g;
-
-	cmd[0] = '\0';
-	cmd2[0] = '\0';
 
 	/*
 	 * Initialise the global structure
@@ -350,8 +366,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 	/*
 	 * Sanity check our parameters
 	 */
-	if (g.com_address == 99) {
-		fprintf(stderr, "Require com port address for BK-390A meter, ie, -p 2\r\n");
+	if (g.com_address == DEFAULT_COM_PORT) {
+		wprintf(L"Require com port address for BK-390A meter, ie, -p 2 (for COM2)\r\n");
 		exit(1);
 	} else {
 		snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
@@ -373,12 +389,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 		 * Check the outcome of the attempt to create the handle for the com port
 		 */
 		if (hComm == INVALID_HANDLE_VALUE) {
-			wprintf(L"Error on: %s\r\n", com_port);
-			fprintf(stderr, "Error! - Port '%s' can't be opened\r\n", g.com_address);
+			wprintf(L"Error while trying to open com port 'COM%d'\r\n", g.com_address);
 			exit(1);
 		} else {
-			if (!g.quiet)
-				printf("Port COM%d Opened\r\n", g.com_address);
+			if (!g.quiet) wprintf(L"Port COM%d Opened\r\n", g.com_address);
 		}
 
 		/*
@@ -389,7 +403,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 
 		com_read_status = GetCommState(hComm, &dcbSerialParams); // Retrieve current settings
 		if (com_read_status == FALSE) {
-			fprintf(stderr, "Error in getting GetCommState()\r\n");
+			wprintf(L"Error in getting GetCommState()\r\n");
 		}
 
 		dcbSerialParams.BaudRate = CBR_2400;
@@ -405,7 +419,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			else if (strncmp(p, "2400:", 5) == 0) dcbSerialParams.BaudRate = CBR_2400; // BaudRate = 2400
 			else if (strncmp(p, "1200:", 5) == 0) dcbSerialParams.BaudRate = CBR_1200; // BaudRate = 1200
 			else {
-				fprintf(stderr, "Invalid serial speed\r\n");
+				wprintf(L"Invalid serial speed\r\n");
 				exit(1);
 			}
 
@@ -413,7 +427,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			if (*p == '7') dcbSerialParams.ByteSize = 7;
 			else if (*p == '8') dcbSerialParams.ByteSize = 8;
 			else {
-				fprintf(stderr, "Invalid serial byte size '%c'\r\n", *p);
+				wprintf(L"Invalid serial byte size '%c'\r\n", *p);
 				exit(1);
 			}
 
@@ -422,7 +436,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			else if (*p == 'e') dcbSerialParams.Parity = EVENPARITY;
 			else if (*p == 'n') dcbSerialParams.Parity = NOPARITY;
 			else {
-				fprintf(stderr, "Invalid serial parity type '%c'\r\n", *p);
+				wprintf(L"Invalid serial parity type '%c'\r\n", *p);
 				exit(1);
 			}
 
@@ -430,22 +444,22 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			if (*p == '1') dcbSerialParams.StopBits = ONESTOPBIT;
 			else if (*p == '2') dcbSerialParams.StopBits = TWOSTOPBITS;
 			else {
-				fprintf(stderr, "Invalid serial stop bits '%c'\r\n", *p);
+				wprintf(L"Invalid serial stop bits '%c'\r\n", *p);
 				exit(1);
 			}
 		}
 
 		com_read_status = SetCommState(hComm, &dcbSerialParams);
 		if (com_read_status == FALSE) {
-			fprintf(stderr, "Error setting com port configuration (2400/7/1/O etc)\r\n");
+			wprintf(L"Error setting com port configuration (2400/7/1/O etc)\r\n");
 			exit(1);
 
 		} else {
 			if (!g.quiet) {
-				printf("\tBaudrate = %ld\r\n", dcbSerialParams.BaudRate);
-				printf("\tByteSize = %ld\r\n", dcbSerialParams.ByteSize);
-				printf("\tStopBits = %d\r\n", dcbSerialParams.StopBits);
-				printf("\tParity   = %d\r\n", dcbSerialParams.Parity);
+				wprintf(L"\tBaudrate = %ld\r\n", dcbSerialParams.BaudRate);
+				wprintf(L"\tByteSize = %ld\r\n", dcbSerialParams.ByteSize);
+				wprintf(L"\tStopBits = %d\r\n", dcbSerialParams.StopBits);
+				wprintf(L"\tParity   = %d\r\n", dcbSerialParams.Parity);
 			}
 		}
 
@@ -456,28 +470,26 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 		timeouts.WriteTotalTimeoutConstant = 50;
 		timeouts.WriteTotalTimeoutMultiplier = 10;
 		if (SetCommTimeouts(hComm, &timeouts) == FALSE) {
-			fprintf(stderr, "\tError in setting time-outs\r\n");
+			wprintf(L"\tError in setting time-outs\r\n");
 			exit(1);
 
 		} else {
-			if (!g.quiet)
-				printf("\tSetting time-outs successful\r\n");
+			if (!g.quiet) { wprintf(L"\tSetting time-outs successful\r\n"); }
 		}
 
 		com_read_status = SetCommMask(hComm, EV_RXCHAR); // Configure Windows to Monitor the serial device for Character Reception
 		if (com_read_status == FALSE) {
-			fprintf(stderr, "\tError in setting CommMask\r\n");
+			wprintf(L"\tError in setting CommMask\r\n");
 			exit(1);
 
 		} else {
-			if (!g.quiet)
-				printf("\tCommMask successful\r\n");
+			if (!g.quiet) { wprintf(L"\tCommMask successful\r\n"); }
 		}
 	} // comms enabled
 
 	/*
 	 *
-	 * Now do all the ugly Windows stuff
+	 * Now do all the Windows GDI stuff
 	 *
 	 */
 	BBrush = CreateSolidBrush(g.background_color);
@@ -516,8 +528,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 	 * then we will try to determine a size based on our
 	 * font metrics
 	 */
-	if (g.window_x == 9999) g.window_x = fontmetrics.tmAveCharWidth * 9;
-	if (g.window_y == 9999) g.window_y = ((((fontmetrics.tmAscent) + smallfontmetrics.tmHeight + metrics.iCaptionHeight) * GetDeviceCaps(dc, LOGPIXELSY)) / 72);
+	if (g.window_x == DEFAULT_WINDOW_WIDTH) g.window_x = fontmetrics.tmAveCharWidth * 9;
+	if (g.window_y == DEFAULT_WINDOW_HEIGHT) g.window_y = ((((fontmetrics.tmAscent) + smallfontmetrics.tmHeight + metrics.iCaptionHeight) * GetDeviceCaps(dc, LOGPIXELSY)) / WINDOWS_DPI_DEFAULT);
 
 	hstatic = CreateWindowW(wc.lpszClassName, L"BK-390A Meter", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 50, 50, g.window_x, g.window_y, NULL, NULL, hInstance, NULL);
 
@@ -531,6 +543,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 		double v = 0.0;
 		int end_of_frame_received = 0;
 
+		linetmp[0] = '\0';
 
 		/*
 		 *
@@ -556,7 +569,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 		 */
 		com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); // Wait for the character to be received
 		if (com_read_status == FALSE) {
-			StringCbPrintf(cmd, sizeof(cmd), L"N/C");
+			StringCbPrintf(linetmp, sizeof(linetmp), L"N/C");
 			StringCbPrintf(mmmode, sizeof(mmmode), L"Check RS232");
 
 		} else {
@@ -570,14 +583,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			 *
 			 */
 
-			if (g.debug) fprintf(stdout, "DATA START: ");
+			if (g.debug) { wprintf(L"DATA START: "); }
 			end_of_frame_received = 0;
 			i = 0;
 			do {
 				com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
 				d[i] = temp_char;
 
-				if (g.debug) fprintf(stdout, "%x ", d[i]);
+				if (g.debug) { wprintf(L"%02x ", d[i]); }
 
 				if (temp_char == '\n') {
 					end_of_frame_received = 1;
@@ -586,7 +599,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 				i++;
 			} while ((bytes_read > 0) && (i < sizeof(d)));
 
-			if (g.debug) fprintf(stdout, ":END\r\n");
+			if (g.debug) { wprintf(L":END\r\n"); }
 
 			/*
 			 * Initialise the strings used for units, prefix and mode
@@ -733,13 +746,17 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			 * bytes 1..4 are ASCII char codes for 0000-9999
 			 *
 			 */
-			v = ((d[1] & 0x0F) * 1000) + ((d[2] & 0x0F) * 100) + ((d[3] & 0x0F) * 10) + ((d[4] & 0x0F) * 1);
+			v = ((d[1] & 0x0F) * 1000) 
+				+ ((d[2] & 0x0F) * 100) 
+				+ ((d[3] & 0x0F) * 10) 
+				+ ((d[4] & 0x0F) * 1);
 
 			/*
 			 * Sign of output (+/-)
 			 */
-			if (d[BYTE_STATUS] & STATUS_SIGN)
+			if (d[BYTE_STATUS] & STATUS_SIGN) {
 				v = -v;
+			}
 
 			/*
 			 * If we're not showing the meter mode, then just
@@ -751,22 +768,23 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 
 			/** range checks **/
 			if ((d[BYTE_STATUS] & STATUS_OL) == 1) {
-				StringCbPrintf(cmd, sizeof(cmd), L"O.L.       ");
+				StringCbPrintf(linetmp, sizeof(linetmp), L"O.L.");
 
 			} else {
 				if (dps < 0) dps = 0;
 				if (dps > 3) dps = 3;
 
 				switch (dps) {
-					case 0: StringCbPrintf(cmd, sizeof(cmd), L"% 05.0f%s%s    ", v, prefix, units); break;
-					case 1: StringCbPrintf(cmd, sizeof(cmd), L"% 06.1f%s%s    ", v / 10, prefix, units); break;
-					case 2: StringCbPrintf(cmd, sizeof(cmd), L"% 06.2f%s%s    ", v / 100, prefix, units); break;
-					case 3: StringCbPrintf(cmd, sizeof(cmd), L"% 06.3f%s%s    ", v / 1000, prefix, units); break;
+					case 0: StringCbPrintf(linetmp, sizeof(linetmp), L"% 05.0f%s%s", v, prefix, units); break;
+					case 1: StringCbPrintf(linetmp, sizeof(linetmp), L"% 06.1f%s%s", v / 10, prefix, units); break;
+					case 2: StringCbPrintf(linetmp, sizeof(linetmp), L"% 06.2f%s%s", v / 100, prefix, units); break;
+					case 3: StringCbPrintf(linetmp, sizeof(linetmp), L"% 06.3f%s%s", v / 1000, prefix, units); break;
 				}
 			}
 		} // if com-read status == TRUE
 
-		StringCbPrintf(cmd2, sizeof(cmd2), L"%-60s", mmmode);
+		StringCbPrintf(line1, sizeof(line1), L"%-40s", linetmp);
+		StringCbPrintf(line2, sizeof(line2), L"%-40s", mmmode);
 		InvalidateRect(hstatic, NULL, FALSE);
 
 	} // Windows message loop
@@ -792,10 +810,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 			SetTextColor(hdc, glbs->font_color);
 
 			holdFont = SelectObject(hdc, hFont);
-			TextOutW(hdc, 0, 0, cmd, wcslen(cmd));
+			TextOutW(hdc, 0, 0, line1, wcslen(line1));
 
 			holdFont = SelectObject(hdc, hFontBg);
-			TextOutW(hdc, smallfontmetrics.tmAveCharWidth, fontmetrics.tmAscent * 1.1, cmd2, wcslen(cmd2));
+			TextOutW(hdc, smallfontmetrics.tmAveCharWidth, fontmetrics.tmAscent * 1.1, line2, wcslen(line2));
 
 			EndPaint(hwnd, &ps);
 			break;
