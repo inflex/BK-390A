@@ -5,6 +5,8 @@ This software is still in the early beta phase but has been tested and seems to 
 A linux version of this software would be very easy to make, the only change would be the serial port related code (setup and data acquisition).
 
 
+![win-bk390a.exe running in diode mode](https://github.com/inflex/BK-390A/asset/ss-winbk390.png)
+
 # BK-390A
 win-bk390a.exe - GUI windowed application
 bk390a.exe - BK Precision 390A Series multimeter CLI data capture software for OBS/logging on Windows
