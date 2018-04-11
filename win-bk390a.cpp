@@ -128,6 +128,10 @@ struct glb {
 HFONT hFont, hFontBg;
 HFONT holdFont;
 HANDLE hComm;
+DWORD dwRead;
+BOOL fWaitingOnRead = FALSE;
+OVERLAPPED osReader = { 0 };
+
 HWND hstatic;
 HBRUSH BBrush; // = CreateSolidBrush(RGB(0,0,0));
 TEXTMETRIC fontmetrics, smallfontmetrics;

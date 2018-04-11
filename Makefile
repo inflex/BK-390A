@@ -12,7 +12,9 @@ WINCC=i686-w64-mingw32-g++
 WINFLAGS=-fpermissive -municode -static-libgcc -fpermissive -static-libstdc++
 
 OBJ=bk390a
+WINOBJ=win-bk390a.exe
 OFILES=
+
 default: 
 	@echo
 	@echo "   For OBS command line tool: make bk390a"
@@ -32,13 +34,13 @@ win-bk390a: ${OFILES} win-bk390a.cpp
 bk390a: ${OFILES} bk390a.c 
 #	ctags *.[ch]
 #	clear
-	${CC} ${CFLAGS} $(COMPONENTS) bk390a.c ${OFILES} -o bk390a ${LIBS}
+	${CC} ${CFLAGS} $(COMPONENTS) bk390a.c ${OFILES} -o bk390a.exe ${LIBS}
 
-strip: win-bk390a.exe
-	strip win-bk390a.exe
+strip: 
+	strip *.exe
 
 install: ${OBJ}
-	cp bk390a ${LOCATION}/bin/
+	cp bk390a win-bk390a ${LOCATION}/bin/
 
 clean:
-	rm -f *.o *core ${OBJ}
+	rm -f *.o *core ${OBJ} ${WINOBJ}
