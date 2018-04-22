@@ -21,10 +21,10 @@
 #include <unistd.h>
 #include <wchar.h>
 
-char VERSION[] = "v0.4 Beta";
+char VERSION[] = "v0.5 Beta";
 char help[] = "BK-Precision 390A Multimeter serial data decoder\r\n"
 "By Paul L Daniels / pldaniels@gmail.com\r\n"
-"v0.4 BETA / April 11, 2018\r\n"
+"v0.5 BETA / April 11, 2018\r\n"
 "\r\n"
 " -p <comport#> [-s <serial port config>] [-m] [-fn <fontname>] [-fc <#rrggbb>] [-fw <weight>] [-bc <#rrggbb>] [-wx <width>] [-wy <height>] [-d] [-q]\r\n"
 "\r\n"
@@ -609,9 +609,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			 * Initialise the strings used for units, prefix and mode
 			 * so we don't end up with uncleared prefixes etc
 			 * ( see https://www.youtube.com/watch?v=5HUyEykicEQ )
+			 *
+			 * Prefix string initialised to single space, prevents 
+			 * annoying string width jump (on monospace, can't stop
+			 * it with variable width strings unless we draw the 
+			 * prefix+units separately in a fixed location
+			 *
 			 */
+			StringCbPrintf(prefix, sizeof(prefix), L" ");
 			units[0] = '\0';
-			prefix[0] = '\0';
 			mmmode[0] = '\0';
 
 			/*
