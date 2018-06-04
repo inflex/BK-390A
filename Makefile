@@ -11,7 +11,7 @@ WINCC=i686-w64-mingw32-g++
 # -municode eliminates the WinMain@16 link error when we're using wWinMain
 WINFLAGS=-fpermissive -municode -static-libgcc -fpermissive -static-libstdc++
 
-OBJ=bk390a
+OBJ=bk390a.exe
 WINOBJ=win-bk390a.exe
 OFILES=
 
@@ -29,18 +29,18 @@ all: ${OBJ}
 win-bk390a: ${OFILES} win-bk390a.cpp 
 #	ctags *.[ch]
 #	clear
-	${WINCC} ${CFLAGS} ${WINFLAGS} $(COMPONENTS) win-bk390a.cpp ${OFILES} -o win-bk390a.exe ${LIBS} ${WINLIBS}
+	${WINCC} ${CFLAGS} ${WINFLAGS} $(COMPONENTS) win-bk390a.cpp ${OFILES} -o ${WINOBJ} ${LIBS} ${WINLIBS}
 
 bk390a: ${OFILES} bk390a.c 
 #	ctags *.[ch]
 #	clear
-	${CC} ${CFLAGS} $(COMPONENTS) bk390a.c ${OFILES} -o bk390a.exe ${LIBS}
+	${CC} ${CFLAGS} $(COMPONENTS) bk390a.c ${OFILES} -o ${OBJ} ${LIBS}
 
 strip: 
 	strip *.exe
 
 install: ${OBJ}
-	cp bk390a win-bk390a ${LOCATION}/bin/
+	cp ${OBJ} ${WINOBJ} ${LOCATION}/bin/
 
 clean:
 	rm -f *.o *core ${OBJ} ${WINOBJ}
