@@ -2,17 +2,18 @@
 # VERSION CHANGES
 #
 
+LOCATION=/usr/local
 CFLAGS=-O
 LIBS=
 WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32
-CC=gcc
-WINCC=g++
+WINCC=i686-w64-mingw32-g++
 # -fpermissive is needed to stop the warnings about casting stoppping the build
 # -municode eliminates the WinMain@16 link error when we're using wWinMain
-WINFLAGS=-fpermissive -static-libgcc -municode -fpermissive -static-libstdc++
+WINFLAGS=-fpermissive -municode -static-libgcc -fpermissive -static-libstdc++
 
-OBJ=bk390a.exe
+OBJ=bk390a
 WINOBJ=win-bk390a.exe
+OFILES=
 
 default: 
 	@echo
@@ -20,11 +21,26 @@ default:
 	@echo "   For GUI tool: make win-bk390a"
 	@echo
 
-win-bk390a: win-bk390a.cpp 
-	${WINCC} ${CFLAGS} ${WINFLAGS} $(COMPONENTS) win-bk390a.cpp ${OFILES} -o ${WINOBJ} ${LIBS} ${WINLIBS}
+.c.o:
+	${CC} ${CFLAGS} $(COMPONENTS) -c $*.c
 
-bk390a: bk390a.c 
-	${CC} ${CFLAGS} $(COMPONENTS) bk390a.c ${OFILES} -o ${OBJ} ${LIBS}
+all: ${OBJ} 
+
+win-bk390a: ${OFILES} win-bk390a.cpp 
+#	ctags *.[ch]
+#	clear
+	${WINCC} ${CFLAGS} ${WINFLAGS} $(COMPONENTS) win-bk390a.cpp ${OFILES} -o win-bk390a.exe ${LIBS} ${WINLIBS}
+
+bk390a: ${OFILES} bk390a.c 
+#	ctags *.[ch]
+#	clear
+	${CC} ${CFLAGS} $(COMPONENTS) bk390a.c ${OFILES} -o bk390a.exe ${LIBS}
+
+strip: 
+	strip *.exe
+
+install: ${OBJ}
+	cp bk390a win-bk390a ${LOCATION}/bin/
 
 clean:
-	del /s ${OBJ} ${WINOBJ}
+	rm -f *.o *core ${OBJ} ${WINOBJ}
