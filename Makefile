@@ -5,7 +5,7 @@
 LOCATION=/usr/local
 CFLAGS=-O
 LIBS=
-WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32
+WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32 -lwinspool
 WINCC=i686-w64-mingw32-g++
 # -fpermissive is needed to stop the warnings about casting stoppping the build
 # -municode eliminates the WinMain@16 link error when we're using wWinMain

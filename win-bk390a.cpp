@@ -437,11 +437,20 @@ void enable_coms(struct glb *pg, wchar_t *com_port)
 }
 
 // Based on code from: https://bytes.com/topic/net/answers/666485-trying-retrieve-list-active-serial-com-ports-c
-bool auto_detect_port(uint8_t &port_name)
+bool auto_detect_port(struct glb *pg)
 {
+   struct glb g = *pg;
    TCHAR szDevices[65535];
    unsigned long dwChars = QueryDosDevice(NULL, szDevices, 65535);
    TCHAR *ptr = szDevices;
+   wchar_t com_port[SSIZE]; // com port path / ie, \\.COM4
+   char temp_char;        // Temporary character
+   uint8_t d[SSIZE];      // Serial data packet
+   DWORD bytes_read;      // Number of bytes read by ReadFile()
+   int end_of_frame_received = 0;
+   BOOL com_read_status;
+   DWORD dwEventMask;     // Event mask to trigger
+   int i;
 
    while (dwChars)
    {
@@ -450,8 +459,53 @@ bool auto_detect_port(uint8_t &port_name)
       if (swscanf(ptr, L"COM%d", &port) == 1) // if it finds the format COM#
       {
          // found a com port!
-         // try to communicate and listen for appropriately-formatted data packet
-         wprintf(L"Port detected: COM%d\r\n",port);
+         // it will never be COM1, which is reserved
+         if (port != 1) {
+            // try to communicate and listen for appropriately-formatted data packet
+            wprintf(L"Port detected: COM%d\r\n",port);
+            
+            snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", port);
+            if (g.comms_enabled) {
+               enable_coms(&g, com_port); // establish serial communication parameters
+            }
+            
+            com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); // Wait for the character to be received
+            if (com_read_status == FALSE) { // failed to set up port
+               break; // move on to the next port
+            }
+            
+            // receive data
+            i = 0;
+            do {
+               com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
+               d[i] = temp_char;
+               if (temp_char == '\n') {
+                  end_of_frame_received = 1;
+                  break;
+               }
+               i++;
+            } while ((bytes_read > 0) && (i < sizeof(d)));
+            
+            // see if data is valid with 2 checks
+            // #1 - length check
+            if(i == 11) { // TODO: CONFIRM THIS IS THE CORRECT NUMBER OF TOTAL BYTES RECEIVED
+               // #2 - check to see if the data fits the protocol
+               switch (d[BYTE_FUNCTION]) {
+                  case FUNCTION_VOLTAGE:
+                  case FUNCTION_CURRENT_UA:
+                  case FUNCTION_CURRENT_MA:
+                  case FUNCTION_CURRENT_A:
+                  case FUNCTION_OHMS:
+                  case FUNCTION_CONTINUITY:
+                  case FUNCTION_DIODE:
+                  case FUNCTION_FQ_RPM:
+                  case FUNCTION_CAPACITANCE:
+                  case FUNCTION_TEMPERATURE:
+                     g.com_address = port;
+                     return true; // passed our check
+               }
+            }
+         }
       }
       
       TCHAR *temp_ptr = wcschr(ptr, '\0');
@@ -514,17 +568,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 	 * Sanity check our parameters
 	 */
 	if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
-		if(!auto_detect_port(g.com_address)) // returning false means auto-detect failed
+		if(!auto_detect_port(&g)) // returning false means auto-detect failed
       {
          wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
          exit(1);
       }
-   }
-   
-	snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
-
-	if (g.comms_enabled) {
-      enable_coms(&g, com_port); // establish serial communication parameters
    }
 
 	/*
