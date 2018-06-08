@@ -514,7 +514,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 	 * Sanity check our parameters
 	 */
 	if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
-      test_jds();
 		if(!auto_detect_port(g.com_address)) // returning false means auto-detect failed
       {
          wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
