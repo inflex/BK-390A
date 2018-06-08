@@ -4,7 +4,7 @@
 
 CFLAGS=-O
 LIBS=
-WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32
+WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32 -lwinspool
 CC=gcc
 GCC=g++
 WINFLAGS=-fpermissive -static-libgcc -municode -fpermissive -static-libstdc++
