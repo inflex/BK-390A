@@ -436,11 +436,6 @@ void enable_coms(struct glb *pg, wchar_t *com_port)
    }
 }
 
-void test_jds()
-{
-   
-}
-
 // Based on code from: https://bytes.com/topic/net/answers/666485-trying-retrieve-list-active-serial-com-ports-c
 bool auto_detect_port(uint8_t &port_name)
 {
