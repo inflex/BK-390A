@@ -470,39 +470,37 @@ bool auto_detect_port(struct glb *pg)
             }
             
             com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); // Wait for the character to be received
-            if (com_read_status == FALSE) { // failed to set up port
-               break; // move on to the next port
-            }
-            
-            // receive data
-            i = 0;
-            do {
-               com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
-               d[i] = temp_char;
-               if (temp_char == '\n') {
-                  end_of_frame_received = 1;
-                  break;
-               }
-               i++;
-            } while ((bytes_read > 0) && (i < sizeof(d)));
-            
-            // see if data is valid with 2 checks
-            // #1 - length check
-            if(i == 11) { // TODO: CONFIRM THIS IS THE CORRECT NUMBER OF TOTAL BYTES RECEIVED
-               // #2 - check to see if the data fits the protocol
-               switch (d[BYTE_FUNCTION]) {
-                  case FUNCTION_VOLTAGE:
-                  case FUNCTION_CURRENT_UA:
-                  case FUNCTION_CURRENT_MA:
-                  case FUNCTION_CURRENT_A:
-                  case FUNCTION_OHMS:
-                  case FUNCTION_CONTINUITY:
-                  case FUNCTION_DIODE:
-                  case FUNCTION_FQ_RPM:
-                  case FUNCTION_CAPACITANCE:
-                  case FUNCTION_TEMPERATURE:
-                     g.com_address = port;
-                     return true; // passed our check
+            if (com_read_status != FALSE) { // only do further processing if port was set up correctly
+               // receive data
+               i = 0;
+               do {
+                  com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
+                  d[i] = temp_char;
+                  if (temp_char == '\n') {
+                     end_of_frame_received = 1;
+                     break;
+                  }
+                  i++;
+               } while ((bytes_read > 0) && (i < sizeof(d)));
+               
+               // see if data is valid with 2 checks
+               // #1 - length check
+               if(i == 11) { // TODO: CONFIRM THIS IS THE CORRECT NUMBER OF TOTAL BYTES RECEIVED
+                  // #2 - check to see if the data fits the protocol
+                  switch (d[BYTE_FUNCTION]) {
+                     case FUNCTION_VOLTAGE:
+                     case FUNCTION_CURRENT_UA:
+                     case FUNCTION_CURRENT_MA:
+                     case FUNCTION_CURRENT_A:
+                     case FUNCTION_OHMS:
+                     case FUNCTION_CONTINUITY:
+                     case FUNCTION_DIODE:
+                     case FUNCTION_FQ_RPM:
+                     case FUNCTION_CAPACITANCE:
+                     case FUNCTION_TEMPERATURE:
+                        g.com_address = port;
+                        return true; // passed our check
+                  }
                }
             }
          }
