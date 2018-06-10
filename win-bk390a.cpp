@@ -21,10 +21,10 @@
 #include <unistd.h>
 #include <wchar.h>
 
-char VERSION[] = "v0.5 Beta";
+char VERSION[] = "v0.6 Beta";
 char help[] = "BK-Precision 390A Multimeter serial data decoder\r\n"
 "By Paul L Daniels / pldaniels@gmail.com\r\n"
-"v0.5 BETA / April 11, 2018\r\n"
+"v0.6 BETA / June 10, 2018\r\n"
 "\r\n"
 " -p <comport#> [-s <serial port config>] [-m] [-fn <fontname>] [-fc <#rrggbb>] [-fw <weight>] [-bc <#rrggbb>] [-wx <width>] [-wy <height>] [-d] [-q]\r\n"
 "\r\n"
@@ -127,7 +127,7 @@ struct glb {
  */
 HFONT hFont, hFontBg;
 HFONT holdFont;
-HANDLE hComm;
+HANDLE hComm = NULL;
 DWORD dwRead;
 BOOL fWaitingOnRead = FALSE;
 OVERLAPPED osReader = { 0 };
@@ -426,7 +426,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port)
       if (!g.quiet) { wprintf(L"\tSetting time-outs successful\r\n"); }
    }
 
-   com_read_status = SetCommMask(hComm, EV_RXCHAR); // Configure Windows to Monitor the serial device for Character Reception
+   com_read_status = SetCommMask(hComm, EV_RXCHAR | EV_ERR); // Configure Windows to Monitor the serial device for Character Reception and Errors
    if (com_read_status == FALSE) {
       wprintf(L"\tError in setting CommMask\r\n");
       exit(1);
@@ -462,50 +462,65 @@ bool auto_detect_port(struct glb *pg)
          // it will never be COM1, which is reserved
          if (port != 1) {
             // try to communicate and listen for appropriately-formatted data packet
-            wprintf(L"Port detected: COM%d\r\n",port);
+            if (g.debug) { wprintf(L"Port detected: COM%d\r\n",port); }
             
             snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", port);
+            g.com_address = port;
             if (g.comms_enabled) {
                enable_coms(&g, com_port); // establish serial communication parameters
             }
-            
-            com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); // Wait for the character to be received
-            if (com_read_status != FALSE) { // only do further processing if port was set up correctly
-               // receive data
-               i = 0;
-               do {
-                  com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
-                  d[i] = temp_char;
-                  if (temp_char == '\n') {
-                     end_of_frame_received = 1;
-                     break;
-                  }
-                  i++;
-               } while ((bytes_read > 0) && (i < sizeof(d)));
+            if (g.debug) { wprintf(L"Waiting for 2s to get a data sample\r\n"); }
+            Sleep(2000); // TODO: is there a more elegant way to do this with WaitCommEvent? It just hangs for me on an incorrect port....
+            // receive data
+            if (g.debug) { wprintf(L"DATA START: "); }
+            i = 0;
+            do {
+               com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
+               d[i] = temp_char;
                
-               // see if data is valid with 2 checks
-               // #1 - length check
-               if(i == 11) { // TODO: CONFIRM THIS IS THE CORRECT NUMBER OF TOTAL BYTES RECEIVED
-                  // #2 - check to see if the data fits the protocol
-                  switch (d[BYTE_FUNCTION]) {
-                     case FUNCTION_VOLTAGE:
-                     case FUNCTION_CURRENT_UA:
-                     case FUNCTION_CURRENT_MA:
-                     case FUNCTION_CURRENT_A:
-                     case FUNCTION_OHMS:
-                     case FUNCTION_CONTINUITY:
-                     case FUNCTION_DIODE:
-                     case FUNCTION_FQ_RPM:
-                     case FUNCTION_CAPACITANCE:
-                     case FUNCTION_TEMPERATURE:
-                        g.com_address = port;
-                        return true; // passed our check
-                  }
+               if (g.debug) { wprintf(L"%02x ", d[i]); }
+               
+               if (temp_char == '\n') {
+                  end_of_frame_received = 1;
+                  break;
                }
+               i++;
+            } while ((bytes_read > 0) && (i < sizeof(d)));
+            
+            if (g.debug) { wprintf(L":END\r\n"); }
+            
+            // see if data is valid with 2 checks
+            // #1 - length check
+            if(i % 11 == 0) { // TODO: CONFIRM THIS IS THE CORRECT NUMBER OF TOTAL BYTES RECEIVED
+               if (g.debug) { wprintf(L"LENGTH CHECK: SUCCESS\r\n"); }
+               // #2 - check to see if the data fits the protocol
+               switch (d[BYTE_FUNCTION]) {
+                  case FUNCTION_VOLTAGE:
+                  case FUNCTION_CURRENT_UA:
+                  case FUNCTION_CURRENT_MA:
+                  case FUNCTION_CURRENT_A:
+                  case FUNCTION_OHMS:
+                  case FUNCTION_CONTINUITY:
+                  case FUNCTION_DIODE:
+                  case FUNCTION_FQ_RPM:
+                  case FUNCTION_CAPACITANCE:
+                  case FUNCTION_TEMPERATURE:
+                     if (g.debug) { wprintf(L"DATA FORMAT CHECK: SUCCESS\r\n"); }
+                     return true; // passed our check
+               }
+               
+               if (g.debug) { wprintf(L"DATA FORMAT CHECK: FAIL\r\n"); }
+            }
+            else {
+               if (g.debug) { wprintf(L"LENGTH CHECK: FAIL\r\n"); }
             }
          }
       }
       
+      // if we made it this far, this particular COM did not work out
+      if(hComm) { // prevent small memory leak!
+         CloseHandle(hComm);
+      }
       TCHAR *temp_ptr = wcschr(ptr, '\0');
       dwChars -= (DWORD)((temp_ptr - ptr) / sizeof(TCHAR) + 1);
       ptr = temp_ptr + 1;
@@ -571,6 +586,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
          wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
          exit(1);
       }
+      if (g.debug) { wprintf(L"COM%d automatically detected.\r\n",g.com_address); }
    }
 
 	/*
@@ -668,8 +684,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			 * from the multimeter.
 			 *
 			 */
-
 			if (g.debug) { wprintf(L"DATA START: "); }
+
 			end_of_frame_received = 0;
 			i = 0;
 			do {
