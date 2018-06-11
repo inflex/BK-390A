@@ -443,6 +443,7 @@ bool auto_detect_port(struct glb *pg)
    TCHAR szDevices[65535];
    unsigned long dwChars = QueryDosDevice(NULL, szDevices, 65535);
    TCHAR *ptr = szDevices;
+   
    wchar_t com_port[SSIZE]; // com port path / ie, \\.COM4
    char temp_char;        // Temporary character
    uint8_t d[SSIZE];      // Serial data packet
@@ -587,6 +588,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
          exit(1);
       }
       if (g.debug) { wprintf(L"COM%d automatically detected.\r\n",g.com_address); }
+   }
+   else { // the port was specified, so let's try enabling it
+      if (g.comms_enabled) {
+         enable_coms(&g, g.com_address); // establish serial communication parameters
+      }
    }
 
 	/*
