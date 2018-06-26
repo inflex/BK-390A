@@ -591,7 +591,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
    }
    else { // the port was specified, so let's try enabling it
       if (g.comms_enabled) {
-         enable_coms(&g, g.com_address); // establish serial communication parameters
+         snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
+         enable_coms(&g, com_port); // establish serial communication parameters
       }
    }
 
@@ -623,12 +624,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 
 	hFont = CreateFont(-(g.font_size), 0, 0, 0, g.font_weight, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FIXED_PITCH,
 			g.font_name);
-	holdFont = SelectObject(dc, hFont);
+	holdFont = (HFONT)SelectObject(dc, hFont);
 	GetTextMetrics(dc, &fontmetrics);
 
 	hFontBg = CreateFont(-(g.font_size / 4), 0, 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FIXED_PITCH,
 			g.font_name);
-	holdFont = SelectObject(dc, hFontBg);
+	holdFont = (HFONT)SelectObject(dc, hFontBg);
 	GetTextMetrics(dc, &smallfontmetrics);
 
 	/*
@@ -923,10 +924,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 			SetBkColor(hdc, glbs->background_color);
 			SetTextColor(hdc, glbs->font_color);
 
+         holdFont = (HFONT)SelectObject(hdc, hFont);
 			TextOutW(hdc, 0, 0, line1, wcslen(line1));
-			holdFont = SelectObject(hdc, hFont);
 
-			holdFont = SelectObject(hdc, hFontBg);
+			holdFont = (HFONT)SelectObject(hdc, hFontBg);
 			TextOutW(hdc, smallfontmetrics.tmAveCharWidth, fontmetrics.tmAscent * 1.1, line2, wcslen(line2));
 
 			EndPaint(hwnd, &ps);
