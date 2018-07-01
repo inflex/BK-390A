@@ -13,7 +13,7 @@ bk390a.exe - BK Precision 390A Series multimeter CLI data capture software for O
 
 # Requirements
 
-If you want to build this software on Windows, you'll require MinGW https://sourceforge.net/projects/mingw/files/latest/download
+If you want to build this software on Windows, you'll require MinGW https://sourceforge.net/projects/mingw-w64/
 
 # Setup
 
@@ -23,10 +23,13 @@ If you want to build this software on Windows, you'll require MinGW https://sour
 	make win-bk390a
 	(or)
 	make bk390a
+   
+   An example of compiling on Windows using mingw-w64 would be:
+   
+   mingw32-make -f Makefile.win win-bk390a
+   
 	
-
-
-3) Run from the command line
+2) Run from the command line
 
 	win-bk390a.exe -p 4 -m
 
