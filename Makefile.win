@@ -7,7 +7,7 @@ LIBS=
 WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32 -lwinspool
 CC=gcc
 GCC=g++
-WINFLAGS=-fpermissive -static-libgcc -municode -static-libstdc++
+WINFLAGS=-static-libgcc -municode -static-libstdc++
 
 OBJ=bk390a.exe
 WINOBJ=win-bk390a.exe
