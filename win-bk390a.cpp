@@ -510,20 +510,20 @@ bool auto_detect_port(struct glb *pg) {
                
                if (g.debug) {
                   wprintf(L"DATA FORMAT CHECK: FAIL\r\n");
-						attempts_remaining--;
-                  if(attempts_remaining > 0) {
-                     continue; // try again from the top. same port.
-                  }
                } // if debug
+               attempts_remaining--;
+               if(attempts_remaining > 0) {
+                  continue; // try again from the top. same port.
+               }
 
             } else {
                if (g.debug) {
                   wprintf(L"LENGTH CHECK: FAIL\r\n");
-						attempts_remaining--;
-                  if(attempts_remaining > 0) {
-                     continue; // try again from the top. same port.
-                  }
                } // if debug
+               attempts_remaining--;
+               if(attempts_remaining > 0) {
+                  continue; // try again from the top. same port.
+               }
             }
          }
       }
