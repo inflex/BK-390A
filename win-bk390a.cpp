@@ -56,7 +56,7 @@ char help[] = "BK-Precision 390A Multimeter serial data decoder\r\n"
 #define BYTE_STATUS 6
 #define BYTE_OPTION_1 7
 #define BYTE_OPTION_2 8
-#define CORRECT_MESSAGE_LENGTH 11 // 9 bytes followed by \r\n
+#define DATA_FRAME_SIZE 11 // 9 bytes followed by \r\n
 
 #define FUNCTION_VOLTAGE 0b00111011
 #define FUNCTION_CURRENT_UA 0b00111101
@@ -297,9 +297,9 @@ int parse_parameters(struct glb *g) {
 
 				case 's':
 							 i++;
-							 if (i < argc)
+							 if (i < argc) {
 								 wcstombs(g->serial_params, argv[i], sizeof(g->serial_params));
-							 else {
+							 } else {
 								 wprintf(L"Insufficient parameters; -s <parameters> [eg 9600:8:o:1] = 9600, 8-bit, odd, 1-stop\n");
 								 exit(1);
 							 }
@@ -320,8 +320,7 @@ int parse_parameters(struct glb *g) {
  */
 LRESULT CALLBACK WindowProcedure(HWND, UINT, WPARAM, LPARAM);
 
-void enable_coms(struct glb *pg, wchar_t *com_port)
-{
+void enable_coms(struct glb *pg, wchar_t *com_port) {
    struct glb g = *pg;
    BOOL com_read_status;  // return status of various com port functions
    /*
@@ -403,8 +402,8 @@ void enable_coms(struct glb *pg, wchar_t *com_port)
    if (com_read_status == FALSE) {
       wprintf(L"Error setting com port configuration (2400/7/1/O etc)\r\n");
       exit(1);
-
    } else {
+
       if (!g.quiet) {
          wprintf(L"\tBaudrate = %ld\r\n", dcbSerialParams.BaudRate);
          wprintf(L"\tByteSize = %ld\r\n", dcbSerialParams.ByteSize);
@@ -438,8 +437,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port)
 }
 
 // Based on code from: https://bytes.com/topic/net/answers/666485-trying-retrieve-list-active-serial-com-ports-c
-bool auto_detect_port(struct glb *pg)
-{
+bool auto_detect_port(struct glb *pg) {
    struct glb g = *pg;
    TCHAR szDevices[65535];
    unsigned long dwChars = QueryDosDevice(NULL, szDevices, 65535);
@@ -456,12 +454,10 @@ bool auto_detect_port(struct glb *pg)
    int attempts_remaining = 2;
    
 
-   while (dwChars)
-   {
+   while (dwChars) {
       int port;
       
-      if (swscanf(ptr, L"COM%d", &port) == 1) // if it finds the format COM#
-      {
+      if (swscanf(ptr, L"COM%d", &port) == 1) { // if it finds the format COM#
          // found a com port!
          // it will never be COM1, which is reserved
          if (port != 1) {
@@ -481,9 +477,8 @@ bool auto_detect_port(struct glb *pg)
             do {
                com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
                d[i] = temp_char;
-               i++;
-               
                if (g.debug) { wprintf(L"%02x ", d[i]); }
+               i++;
                
                if (temp_char == '\n') {
                   end_of_frame_received = 1;
@@ -495,7 +490,7 @@ bool auto_detect_port(struct glb *pg)
             
             // see if data is valid with 2 checks
             // #1 - length check
-            if(i == CORRECT_MESSAGE_LENGTH) {
+            if(i == DATA_FRAME_SIZE) {
                if (g.debug) { wprintf(L"LENGTH CHECK: SUCCESS\r\n"); }
                // #2 - check to see if the data fits the protocol
                switch (d[BYTE_FUNCTION]) {
@@ -513,18 +508,35 @@ bool auto_detect_port(struct glb *pg)
                      return true; // passed our check
                }
                
+					/*
+					 * FIXME 
+					 * What's going on with this code?
+					 *
+					 * Are you meant to be including the if (--attempts...) code in the g.debug?
+					 *
+					 * Prefer to do any changes to variables before or outside of the if() tests
+					 * so as to avoid any ambiguities or unexpected side-effects, particularly if
+					 * the tests get shuffled around later.
+					 *
+					 *
+					 */
                if (g.debug) {
                   wprintf(L"DATA FORMAT CHECK: FAIL\r\n");
-                  if(--attempts_remaining > 0)
-                     continue; // try again from the top. same port.
-                  }
-            }
-            else {
+						attempts_remaining--;
+                  if(attempts_remaining > 0) continue; // try again from the top. same port.
+               } // if debug
+
+            } else {
                if (g.debug) {
                   wprintf(L"LENGTH CHECK: FAIL\r\n");
-                  if(--attempts_remaining > 0)
-                     continue; // try again from the top. same port.
-                  }
+						attempts_remaining--;
+                  if(attempts_remaining > 0) continue; // try again from the top. same port.
+               } // if debug
+					/*
+					 * ---END of confusing code section
+					 * FIXME
+					 *
+					 */
             }
          }
       }
@@ -598,14 +610,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 	 * Sanity check our parameters
 	 */
 	if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
-		if(!auto_detect_port(&g)) // returning false means auto-detect failed
-      {
+		if(!auto_detect_port(&g))  { // returning false means auto-detect failed
          wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
          exit(1);
       }
       if (g.debug) { wprintf(L"COM%d automatically detected.\r\n",g.com_address); }
-   }
-   else { // the port was specified, so let's try enabling it
+   } else { // the port was specified, so let's try enabling it
       if (g.comms_enabled) {
          snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
          enable_coms(&g, com_port); // establish serial communication parameters
@@ -713,24 +723,27 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			i = 0;
 			do {
 				com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
-				d[i] = temp_char;
-            i++;
+				if (bytes_read) {
+					d[i] = temp_char;
+					if (g.debug) { wprintf(L"%02x ", d[i]); }
 
-				if (g.debug) { wprintf(L"%02x ", d[i]); }
+			      i++;
 
-				if (temp_char == '\n') {
-					end_of_frame_received = 1;
-					break;
+					if (temp_char == '\n') {
+						end_of_frame_received = 1;
+						break;
+					}
 				}
 			} while ((bytes_read > 0) && (i < sizeof(d)));
 
-			if (g.debug) { wprintf(L":END [%d bytes]\r\n", i +1); }
+			if (g.debug) { wprintf(L":END [%d bytes]\r\n", i); }
 
 			/*
 			 * Validate the received data
+			 *
 			 */
-			if (i != CORRECT_MESSAGE_LENGTH) {
-				if (g.debug) { wprintf(L"Invalid number of bytes, expected 11, received %d, loading previous frame\r\n", i); }
+			if (i != DATA_FRAME_SIZE) {
+				if (g.debug) { wprintf(L"Invalid number of bytes, expected %d, received %d, loading previous frame\r\n", DATA_FRAME_SIZE, i); }
 				if (dt_loaded) memcpy(d, dt, sizeof(d));
 			} else {
 				memcpy(dt, d, sizeof(d)); // make a copy.
