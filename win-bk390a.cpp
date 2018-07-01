@@ -56,6 +56,7 @@ char help[] = "BK-Precision 390A Multimeter serial data decoder\r\n"
 #define BYTE_STATUS 6
 #define BYTE_OPTION_1 7
 #define BYTE_OPTION_2 8
+#define CORRECT_MESSAGE_LENGTH 11 // 9 bytes followed by \r\n
 
 #define FUNCTION_VOLTAGE 0b00111011
 #define FUNCTION_CURRENT_UA 0b00111101
@@ -452,6 +453,8 @@ bool auto_detect_port(struct glb *pg)
    BOOL com_read_status;
    DWORD dwEventMask;     // Event mask to trigger
    int i;
+   int attempts_remaining = 2;
+   
 
    while (dwChars)
    {
@@ -478,6 +481,7 @@ bool auto_detect_port(struct glb *pg)
             do {
                com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
                d[i] = temp_char;
+               i++;
                
                if (g.debug) { wprintf(L"%02x ", d[i]); }
                
@@ -485,14 +489,13 @@ bool auto_detect_port(struct glb *pg)
                   end_of_frame_received = 1;
                   break;
                }
-               i++;
             } while ((bytes_read > 0) && (i < sizeof(d)));
             
             if (g.debug) { wprintf(L":END\r\n"); }
             
             // see if data is valid with 2 checks
             // #1 - length check
-            if(i % 11 == 0) { // TODO: CONFIRM THIS IS THE CORRECT NUMBER OF TOTAL BYTES RECEIVED
+            if(i == CORRECT_MESSAGE_LENGTH) {
                if (g.debug) { wprintf(L"LENGTH CHECK: SUCCESS\r\n"); }
                // #2 - check to see if the data fits the protocol
                switch (d[BYTE_FUNCTION]) {
@@ -510,10 +513,18 @@ bool auto_detect_port(struct glb *pg)
                      return true; // passed our check
                }
                
-               if (g.debug) { wprintf(L"DATA FORMAT CHECK: FAIL\r\n"); }
+               if (g.debug) {
+                  wprintf(L"DATA FORMAT CHECK: FAIL\r\n");
+                  if(--attempts_remaining > 0)
+                     continue; // try again from the top. same port.
+                  }
             }
             else {
-               if (g.debug) { wprintf(L"LENGTH CHECK: FAIL\r\n"); }
+               if (g.debug) {
+                  wprintf(L"LENGTH CHECK: FAIL\r\n");
+                  if(--attempts_remaining > 0)
+                     continue; // try again from the top. same port.
+                  }
             }
          }
       }
@@ -522,9 +533,12 @@ bool auto_detect_port(struct glb *pg)
       if(hComm) { // prevent small memory leak!
          CloseHandle(hComm);
       }
+      
+      // advance the string pointers
       TCHAR *temp_ptr = wcschr(ptr, '\0');
       dwChars -= (DWORD)((temp_ptr - ptr) / sizeof(TCHAR) + 1);
       ptr = temp_ptr + 1;
+      attempts_remaining = 2; // reset remaining attempts
    }
    
    return false; // if we made it to the end of the function, auto-detection failed
@@ -698,6 +712,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			do {
 				com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
 				d[i] = temp_char;
+            i++;
 
 				if (g.debug) { wprintf(L"%02x ", d[i]); }
 
@@ -705,202 +720,204 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 					end_of_frame_received = 1;
 					break;
 				}
-				i++;
 			} while ((bytes_read > 0) && (i < sizeof(d)));
 
 			if (g.debug) { wprintf(L":END\r\n"); }
+         
+         if(i == CORRECT_MESSAGE_LENGTH) {
 
-			/*
-			 * Initialise the strings used for units, prefix and mode
-			 * so we don't end up with uncleared prefixes etc
-			 * ( see https://www.youtube.com/watch?v=5HUyEykicEQ )
-			 *
-			 * Prefix string initialised to single space, prevents 
-			 * annoying string width jump (on monospace, can't stop
-			 * it with variable width strings unless we draw the 
-			 * prefix+units separately in a fixed location
-			 *
-			 */
-			StringCbPrintf(prefix, sizeof(prefix), L" ");
-			units[0] = '\0';
-			mmmode[0] = '\0';
+            /*
+             * Initialise the strings used for units, prefix and mode
+             * so we don't end up with uncleared prefixes etc
+             * ( see https://www.youtube.com/watch?v=5HUyEykicEQ )
+             *
+             * Prefix string initialised to single space, prevents 
+             * annoying string width jump (on monospace, can't stop
+             * it with variable width strings unless we draw the 
+             * prefix+units separately in a fixed location
+             *
+             */
+            StringCbPrintf(prefix, sizeof(prefix), L" ");
+            units[0] = '\0';
+            mmmode[0] = '\0';
 
-			/*
-			 * Decode our data.
-			 *
-			 * While the data sheet gives a very nice matrix for the RANGE and FUNCTION values
-			 * it's probably more human-readable to break it down in to longer code on a per
-			 * function selection.
-			 *
-			 */
-			switch (d[BYTE_FUNCTION]) {
-				case FUNCTION_VOLTAGE:
-					StringCbPrintf(units, sizeof(units), L"V");
-					StringCbPrintf(mmmode, sizeof(mmmode), L"Volts");
+            /*
+             * Decode our data.
+             *
+             * While the data sheet gives a very nice matrix for the RANGE and FUNCTION values
+             * it's probably more human-readable to break it down in to longer code on a per
+             * function selection.
+             *
+             */
+            switch (d[BYTE_FUNCTION]) {
+               case FUNCTION_VOLTAGE:
+                  StringCbPrintf(units, sizeof(units), L"V");
+                  StringCbPrintf(mmmode, sizeof(mmmode), L"Volts");
 
-					switch (d[BYTE_RANGE] & 0x0F) {
-						case 0:
-							dps = 1;
-							StringCbPrintf(prefix, sizeof(prefix), L"m");
-							break;
-						case 1: dps = 3; break;
-						case 2: dps = 2; break;
-						case 3: dps = 1; break;
-						case 4: dps = 0; break;
-					}      // test the range byte for voltages
-					break; // FUNCTION_VOLTAGE
+                  switch (d[BYTE_RANGE] & 0x0F) {
+                     case 0:
+                        dps = 1;
+                        StringCbPrintf(prefix, sizeof(prefix), L"m");
+                        break;
+                     case 1: dps = 3; break;
+                     case 2: dps = 2; break;
+                     case 3: dps = 1; break;
+                     case 4: dps = 0; break;
+                  }      // test the range byte for voltages
+                  break; // FUNCTION_VOLTAGE
 
-				case FUNCTION_CURRENT_UA:
-					StringCbPrintf(units, sizeof(units), L"A");
-					StringCbPrintf(prefix, sizeof(prefix), L"m");
-					StringCbPrintf(mmmode, sizeof(mmmode), L"Amps");
+               case FUNCTION_CURRENT_UA:
+                  StringCbPrintf(units, sizeof(units), L"A");
+                  StringCbPrintf(prefix, sizeof(prefix), L"m");
+                  StringCbPrintf(mmmode, sizeof(mmmode), L"Amps");
 
-					switch (d[BYTE_RANGE] & 0x0F) {
-						case 0: dps = 2; break;
-						case 1: dps = 1; break;
-					}
-					break; // FUNCTION_CURRENT_UA
+                  switch (d[BYTE_RANGE] & 0x0F) {
+                     case 0: dps = 2; break;
+                     case 1: dps = 1; break;
+                  }
+                  break; // FUNCTION_CURRENT_UA
 
-				case FUNCTION_CURRENT_MA:
-					StringCbPrintf(units, sizeof(units), L"A");
-					StringCbPrintf(prefix, sizeof(prefix), L"\u00B5");
-					StringCbPrintf(mmmode, sizeof(mmmode), L"Amps");
+               case FUNCTION_CURRENT_MA:
+                  StringCbPrintf(units, sizeof(units), L"A");
+                  StringCbPrintf(prefix, sizeof(prefix), L"\u00B5");
+                  StringCbPrintf(mmmode, sizeof(mmmode), L"Amps");
 
-					switch (d[BYTE_RANGE] & 0x0F) {
-						case 0: dps = 1; break;
-						case 1: dps = 0; break;
-					}
-					break; // FUNCTION_CURRENT_MA
+                  switch (d[BYTE_RANGE] & 0x0F) {
+                     case 0: dps = 1; break;
+                     case 1: dps = 0; break;
+                  }
+                  break; // FUNCTION_CURRENT_MA
 
-				case FUNCTION_CURRENT_A:
-					StringCbPrintf(units, sizeof(units), L"A");
-					StringCbPrintf(mmmode, sizeof(mmmode), L"Amps");
-					break; // FUNCTION_CURRENT_A
+               case FUNCTION_CURRENT_A:
+                  StringCbPrintf(units, sizeof(units), L"A");
+                  StringCbPrintf(mmmode, sizeof(mmmode), L"Amps");
+                  break; // FUNCTION_CURRENT_A
 
-				case FUNCTION_OHMS:
-					StringCbPrintf(mmmode, sizeof(mmmode), L"Resistance");
-					StringCbPrintf(units, sizeof(units), L"\u2126");
+               case FUNCTION_OHMS:
+                  StringCbPrintf(mmmode, sizeof(mmmode), L"Resistance");
+                  StringCbPrintf(units, sizeof(units), L"\u2126");
 
-					switch (d[BYTE_RANGE] & 0x0F) {
-						case 0: dps = 1; break;
-						case 1: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
-						case 2: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
-						case 3: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
-						case 4: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
-						case 5: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
-					}
-					break; // FUNCTION_OHMS
+                  switch (d[BYTE_RANGE] & 0x0F) {
+                     case 0: dps = 1; break;
+                     case 1: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+                     case 2: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+                     case 3: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+                     case 4: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+                     case 5: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+                  }
+                  break; // FUNCTION_OHMS
 
-				case FUNCTION_CONTINUITY:
-					StringCbPrintf(mmmode, sizeof(mmmode), L"Continuity");
-					StringCbPrintf(units, sizeof(units), L"\u2126");
-					dps = 1;
-					break; // FUNCTION_CONTINUITY
+               case FUNCTION_CONTINUITY:
+                  StringCbPrintf(mmmode, sizeof(mmmode), L"Continuity");
+                  StringCbPrintf(units, sizeof(units), L"\u2126");
+                  dps = 1;
+                  break; // FUNCTION_CONTINUITY
 
-				case FUNCTION_DIODE:
-					StringCbPrintf(mmmode, sizeof(mmmode), L"DIODE");
-					StringCbPrintf(units, sizeof(units), L"V");
-					dps = 3;
-					break; // FUNCTION_DIODE
+               case FUNCTION_DIODE:
+                  StringCbPrintf(mmmode, sizeof(mmmode), L"DIODE");
+                  StringCbPrintf(units, sizeof(units), L"V");
+                  dps = 3;
+                  break; // FUNCTION_DIODE
 
-				case FUNCTION_FQ_RPM:
-					if (d[BYTE_STATUS] & STATUS_JUDGE) {
-						StringCbPrintf(mmmode, sizeof(mmmode), L"Frequency");
-						StringCbPrintf(units, sizeof(units), L"Hz");
-						switch (d[BYTE_RANGE] & 0x0F) {
-							case 0: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
-							case 1: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
-							case 2: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
-							case 3: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
-							case 4: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
-							case 5: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
-						} // switch
+               case FUNCTION_FQ_RPM:
+                  if (d[BYTE_STATUS] & STATUS_JUDGE) {
+                     StringCbPrintf(mmmode, sizeof(mmmode), L"Frequency");
+                     StringCbPrintf(units, sizeof(units), L"Hz");
+                     switch (d[BYTE_RANGE] & 0x0F) {
+                        case 0: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+                        case 1: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+                        case 2: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+                        case 3: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+                        case 4: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+                        case 5: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+                     } // switch
 
-					} else {
-						StringCbPrintf(mmmode, sizeof(mmmode), L"RPM");
-						StringCbPrintf(units, sizeof(units), L"rpm");
-						switch (d[BYTE_RANGE] & 0x0F) {
-							case 0: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
-							case 1: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
-							case 2: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
-							case 3: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
-							case 4: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
-							case 5: dps = 0; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
-						} // switch
-					}
-					break; // FUNCTION_FQ_RPM
+                  } else {
+                     StringCbPrintf(mmmode, sizeof(mmmode), L"RPM");
+                     StringCbPrintf(units, sizeof(units), L"rpm");
+                     switch (d[BYTE_RANGE] & 0x0F) {
+                        case 0: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+                        case 1: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"k"); break;
+                        case 2: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+                        case 3: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+                        case 4: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+                        case 5: dps = 0; StringCbPrintf(prefix, sizeof(prefix), L"M"); break;
+                     } // switch
+                  }
+                  break; // FUNCTION_FQ_RPM
 
-				case FUNCTION_CAPACITANCE:
-					StringCbPrintf(mmmode, sizeof(mmmode), L"Capacitance");
-					StringCbPrintf(units, sizeof(units), L"F");
-					switch (d[BYTE_RANGE] & 0x0F) {
-						case 0: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"n"); break;
-						case 1: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"n"); break;
-						case 2: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"n"); break;
-						case 3: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"\u00B5"); break;
-						case 4: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"\u00B5"); break;
-						case 5: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"\u00B5"); break;
-						case 6: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"m"); break;
-						case 7: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"m"); break;
-					}
-					break; // FUNCTION_CAPACITANCE
+               case FUNCTION_CAPACITANCE:
+                  StringCbPrintf(mmmode, sizeof(mmmode), L"Capacitance");
+                  StringCbPrintf(units, sizeof(units), L"F");
+                  switch (d[BYTE_RANGE] & 0x0F) {
+                     case 0: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"n"); break;
+                     case 1: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"n"); break;
+                     case 2: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"n"); break;
+                     case 3: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"\u00B5"); break;
+                     case 4: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"\u00B5"); break;
+                     case 5: dps = 1; StringCbPrintf(prefix, sizeof(prefix), L"\u00B5"); break;
+                     case 6: dps = 3; StringCbPrintf(prefix, sizeof(prefix), L"m"); break;
+                     case 7: dps = 2; StringCbPrintf(prefix, sizeof(prefix), L"m"); break;
+                  }
+                  break; // FUNCTION_CAPACITANCE
 
-				case FUNCTION_TEMPERATURE:
-					StringCbPrintf(mmmode, sizeof(mmmode), L"Temperature");
-					if (d[BYTE_STATUS] & STATUS_JUDGE) {
-						StringCbPrintf(units, sizeof(units), L"\u00B0C");
-					} else {
-						StringCbPrintf(units, sizeof(units), L"\u00B0F");
-					}
-					break; // FUNCTION_TEMPERATURE
-			}
+               case FUNCTION_TEMPERATURE:
+                  StringCbPrintf(mmmode, sizeof(mmmode), L"Temperature");
+                  if (d[BYTE_STATUS] & STATUS_JUDGE) {
+                     StringCbPrintf(units, sizeof(units), L"\u00B0C");
+                  } else {
+                     StringCbPrintf(units, sizeof(units), L"\u00B0F");
+                  }
+                  break; // FUNCTION_TEMPERATURE
+            }
 
-			/*
-			 * Decode the digit data in to human-readable
-			 *
-			 * bytes 1..4 are ASCII char codes for 0000-9999
-			 *
-			 */
-			v = ((d[1] & 0x0F) * 1000) 
-				+ ((d[2] & 0x0F) * 100) 
-				+ ((d[3] & 0x0F) * 10) 
-				+ ((d[4] & 0x0F) * 1);
+            /*
+             * Decode the digit data in to human-readable
+             *
+             * bytes 1..4 are ASCII char codes for 0000-9999
+             *
+             */
+            v = ((d[1] & 0x0F) * 1000) 
+               + ((d[2] & 0x0F) * 100) 
+               + ((d[3] & 0x0F) * 10) 
+               + ((d[4] & 0x0F) * 1);
 
-			/*
-			 * Sign of output (+/-)
-			 */
-			if (d[BYTE_STATUS] & STATUS_SIGN) {
-				v = -v;
-			}
+            /*
+             * Sign of output (+/-)
+             */
+            if (d[BYTE_STATUS] & STATUS_SIGN) {
+               v = -v;
+            }
 
-			/*
-			 * If we're not showing the meter mode, then just
-			 * zero the string we generated previously
-			 */
-			if (g.show_mode == 0) {
-				mmmode[0] = 0;
-			}
+            /*
+             * If we're not showing the meter mode, then just
+             * zero the string we generated previously
+             */
+            if (g.show_mode == 0) {
+               mmmode[0] = 0;
+            }
 
-			/** range checks **/
-			if ((d[BYTE_STATUS] & STATUS_OL) == 1) {
-				StringCbPrintf(linetmp, sizeof(linetmp), L"O.L.");
+            /** range checks **/
+            if ((d[BYTE_STATUS] & STATUS_OL) == 1) {
+               StringCbPrintf(linetmp, sizeof(linetmp), L"O.L.");
 
-			} else {
-				if (dps < 0) dps = 0;
-				if (dps > 3) dps = 3;
+            } else {
+               if (dps < 0) dps = 0;
+               if (dps > 3) dps = 3;
 
-				switch (dps) {
-					case 0: StringCbPrintf(linetmp, sizeof(linetmp), L"% 05.0f%s%s", v, prefix, units); break;
-					case 1: StringCbPrintf(linetmp, sizeof(linetmp), L"% 06.1f%s%s", v / 10, prefix, units); break;
-					case 2: StringCbPrintf(linetmp, sizeof(linetmp), L"% 06.2f%s%s", v / 100, prefix, units); break;
-					case 3: StringCbPrintf(linetmp, sizeof(linetmp), L"% 06.3f%s%s", v / 1000, prefix, units); break;
-				}
-			}
-		} // if com-read status == TRUE
+               switch (dps) {
+                  case 0: StringCbPrintf(linetmp, sizeof(linetmp), L"% 05.0f%s%s", v, prefix, units); break;
+                  case 1: StringCbPrintf(linetmp, sizeof(linetmp), L"% 06.1f%s%s", v / 10, prefix, units); break;
+                  case 2: StringCbPrintf(linetmp, sizeof(linetmp), L"% 06.2f%s%s", v / 100, prefix, units); break;
+                  case 3: StringCbPrintf(linetmp, sizeof(linetmp), L"% 06.3f%s%s", v / 1000, prefix, units); break;
+               }
+            }
+         } // if length check passes
+      } // if com-read status == TRUE
 
-		StringCbPrintf(line1, sizeof(line1), L"%-40s", linetmp);
-		StringCbPrintf(line2, sizeof(line2), L"%-40s", mmmode);
-		InvalidateRect(hstatic, NULL, FALSE);
+      StringCbPrintf(line1, sizeof(line1), L"%-40s", linetmp);
+      StringCbPrintf(line2, sizeof(line2), L"%-40s", mmmode);
+      InvalidateRect(hstatic, NULL, FALSE);
 
 	} // Windows message loop
 
