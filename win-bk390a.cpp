@@ -21,10 +21,10 @@
 #include <unistd.h>
 #include <wchar.h>
 
-char VERSION[] = "v0.5 Beta";
+char VERSION[] = "v0.6 Beta";
 char help[] = "BK-Precision 390A Multimeter serial data decoder\r\n"
 "By Paul L Daniels / pldaniels@gmail.com\r\n"
-"v0.5 BETA / April 11, 2018\r\n"
+"v0.6 BETA / July 1, 2018\r\n"
 "\r\n"
 " -p <comport#> [-s <serial port config>] [-m] [-fn <fontname>] [-fc <#rrggbb>] [-fw <weight>] [-bc <#rrggbb>] [-wx <width>] [-wy <height>] [-d] [-q]\r\n"
 "\r\n"
@@ -343,6 +343,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 	wchar_t mmmode[SSIZE]; // Multimeter mode, Resistance/diode/cap etc
 
 	uint8_t d[SSIZE];      // Serial data packet
+	uint8_t dt[SSIZE];      // Serial data packet
+	int dt_loaded = 0;	// set when we have our first valid data
 	uint8_t dps = 0;     // Number of decimal places
 	struct glb g;        // Global structure for passing variables around
 	int i = 0;           // Generic counter
@@ -603,7 +605,18 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 				i++;
 			} while ((bytes_read > 0) && (i < sizeof(d)));
 
-			if (g.debug) { wprintf(L":END\r\n"); }
+			if (g.debug) { wprintf(L":END [%d bytes]\r\n", i +1); }
+
+			/*
+			 * Validate the received data
+			 */
+			if (i != 10) {
+				if (g.debug) { wprintf(L"Invalid number of bytes, expected 11, received %d, loading previous frame\r\n", i); }
+				if (dt_loaded) memcpy(d, dt, sizeof(d));
+			} else {
+				memcpy(dt, d, sizeof(d)); // make a copy.
+				dt_loaded = 1;
+			}
 
 			/*
 			 * Initialise the strings used for units, prefix and mode
