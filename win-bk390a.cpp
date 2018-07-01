@@ -729,7 +729,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			/*
 			 * Validate the received data
 			 */
-			if (i != 11) {
+			if (i != CORRECT_MESSAGE_LENGTH) {
 				if (g.debug) { wprintf(L"Invalid number of bytes, expected 11, received %d, loading previous frame\r\n", i); }
 				if (dt_loaded) memcpy(d, dt, sizeof(d));
 			} else {
