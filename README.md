@@ -37,7 +37,8 @@ The program will display in text the current meter display and also generate a t
 
 # Usage
 
-	 win-bk390a -p <comport#> [-s <serial port config>] [-m] [-fn <fontname>] [-fc <#rrggbb>] [-fw <weight>] [-bc <#rrggbb>] [-wx <width>] [-wy <height>] [-d] [-q]
+
+	 win-bk390a [-p <comport#>] [-s <serial port config>] [-m] [-fn <fontname>] [-fc <#rrggbb>] [-fw <weight>] [-bc <#rrggbb>] [-wx <width>] [-wy <height>] [-d] [-q]
 
         -h: This help
         -p <comport>: Set the com port for the meter, eg: -p 2
