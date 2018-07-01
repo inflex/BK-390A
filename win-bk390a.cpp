@@ -508,35 +508,22 @@ bool auto_detect_port(struct glb *pg) {
                      return true; // passed our check
                }
                
-					/*
-					 * FIXME 
-					 * What's going on with this code?
-					 *
-					 * Are you meant to be including the if (--attempts...) code in the g.debug?
-					 *
-					 * Prefer to do any changes to variables before or outside of the if() tests
-					 * so as to avoid any ambiguities or unexpected side-effects, particularly if
-					 * the tests get shuffled around later.
-					 *
-					 *
-					 */
                if (g.debug) {
                   wprintf(L"DATA FORMAT CHECK: FAIL\r\n");
 						attempts_remaining--;
-                  if(attempts_remaining > 0) continue; // try again from the top. same port.
+                  if(attempts_remaining > 0) {
+                     continue; // try again from the top. same port.
+                  }
                } // if debug
 
             } else {
                if (g.debug) {
                   wprintf(L"LENGTH CHECK: FAIL\r\n");
 						attempts_remaining--;
-                  if(attempts_remaining > 0) continue; // try again from the top. same port.
+                  if(attempts_remaining > 0) {
+                     continue; // try again from the top. same port.
+                  }
                } // if debug
-					/*
-					 * ---END of confusing code section
-					 * FIXME
-					 *
-					 */
             }
          }
       }
