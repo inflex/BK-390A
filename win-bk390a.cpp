@@ -660,17 +660,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 
 				case FUNCTION_CURRENT_UA:
 					StringCbPrintf(units, sizeof(units), L"A");
-					StringCbPrintf(prefix, sizeof(prefix), L"m");
-					StringCbPrintf(mmmode, sizeof(mmmode), L"Amps");
-
-					switch (d[BYTE_RANGE] & 0x0F) {
-						case 0: dps = 2; break;
-						case 1: dps = 1; break;
-					}
-					break; // FUNCTION_CURRENT_UA
-
-				case FUNCTION_CURRENT_MA:
-					StringCbPrintf(units, sizeof(units), L"A");
 					StringCbPrintf(prefix, sizeof(prefix), L"\u00B5");
 					StringCbPrintf(mmmode, sizeof(mmmode), L"Amps");
 
@@ -678,11 +667,23 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 						case 0: dps = 1; break;
 						case 1: dps = 0; break;
 					}
+					break; // FUNCTION_CURRENT_UA
+
+				case FUNCTION_CURRENT_MA:
+					StringCbPrintf(units, sizeof(units), L"A");
+					StringCbPrintf(prefix, sizeof(prefix), L"m");
+					StringCbPrintf(mmmode, sizeof(mmmode), L"Amps");
+
+					switch (d[BYTE_RANGE] & 0x0F) {
+						case 0: dps = 2; break;
+						case 1: dps = 1; break;
+					}
 					break; // FUNCTION_CURRENT_MA
 
 				case FUNCTION_CURRENT_A:
 					StringCbPrintf(units, sizeof(units), L"A");
 					StringCbPrintf(mmmode, sizeof(mmmode), L"Amps");
+					dps = 2;
 					break; // FUNCTION_CURRENT_A
 
 				case FUNCTION_OHMS:
@@ -712,7 +713,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 					break; // FUNCTION_DIODE
 
 				case FUNCTION_FQ_RPM:
-					if (d[BYTE_STATUS] & STATUS_JUDGE) {
+					if (!(d[BYTE_STATUS] & STATUS_JUDGE)) {
 						StringCbPrintf(mmmode, sizeof(mmmode), L"Frequency");
 						StringCbPrintf(units, sizeof(units), L"Hz");
 						switch (d[BYTE_RANGE] & 0x0F) {
@@ -760,6 +761,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 					} else {
 						StringCbPrintf(units, sizeof(units), L"\u00B0F");
 					}
+					dps = 0;
 					break; // FUNCTION_TEMPERATURE
 			}
 
