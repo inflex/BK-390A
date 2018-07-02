@@ -414,7 +414,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
 
    COMMTIMEOUTS timeouts = {0};
    timeouts.ReadIntervalTimeout = 50;
-   timeouts.ReadTotalTimeoutConstant = 500; // ReadFile should wait up to half a second
+   timeouts.ReadTotalTimeoutConstant = 1000; // ReadFile should wait up to one second
    timeouts.ReadTotalTimeoutMultiplier = 10;
    timeouts.WriteTotalTimeoutConstant = 50;
    timeouts.WriteTotalTimeoutMultiplier = 10;
