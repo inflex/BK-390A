@@ -594,22 +594,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 	parse_parameters(&g);
 
 	/*
-	 * Sanity check our parameters
-	 */
-	if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
-		if(!auto_detect_port(&g))  { // returning false means auto-detect failed
-         wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
-         exit(1);
-      }
-      if (g.debug) { wprintf(L"COM%d automatically detected.\r\n",g.com_address); }
-   } else { // the port was specified, so let's try enabling it
-      if (g.comms_enabled) {
-         snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
-         enable_coms(&g, com_port); // establish serial communication parameters
-      }
-   }
-
-	/*
 	 *
 	 * Now do all the Windows GDI stuff
 	 *
@@ -655,6 +639,21 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 
 	hstatic = CreateWindowW(wc.lpszClassName, L"BK-390A Meter", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 50, 50, g.window_x, g.window_y, NULL, NULL, hInstance, NULL);
 
+   /*
+	 * Handle the COM Port
+	 */
+	if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
+		if(!auto_detect_port(&g))  { // returning false means auto-detect failed
+         wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
+         exit(1);
+      }
+      if (g.debug) { wprintf(L"COM%d automatically detected.\r\n",g.com_address); }
+   } else { // the port was specified, so let's try enabling it
+      if (g.comms_enabled) {
+         snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
+         enable_coms(&g, com_port); // establish serial communication parameters
+      }
+   }
 
 	/*
 	 * Keep reading, interpreting and converting data until someone
