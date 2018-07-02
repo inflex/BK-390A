@@ -353,6 +353,8 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
    com_read_status = GetCommState(hComm, &dcbSerialParams); // Retrieve current settings
    if (com_read_status == FALSE) {
       wprintf(L"Error in getting GetCommState()\r\n");
+      CloseHandle(hComm);
+      exit(1);
    }
 
    dcbSerialParams.BaudRate = CBR_2400;
@@ -369,6 +371,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
       else if (strncmp(p, "1200:", 5) == 0) dcbSerialParams.BaudRate = CBR_1200; // BaudRate = 1200
       else {
          wprintf(L"Invalid serial speed\r\n");
+         CloseHandle(hComm);
          exit(1);
       }
 
@@ -377,6 +380,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
       else if (*p == '8') dcbSerialParams.ByteSize = 8;
       else {
          wprintf(L"Invalid serial byte size '%c'\r\n", *p);
+         CloseHandle(hComm);
          exit(1);
       }
 
@@ -386,6 +390,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
       else if (*p == 'n') dcbSerialParams.Parity = NOPARITY;
       else {
          wprintf(L"Invalid serial parity type '%c'\r\n", *p);
+         CloseHandle(hComm);
          exit(1);
       }
 
@@ -394,6 +399,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
       else if (*p == '2') dcbSerialParams.StopBits = TWOSTOPBITS;
       else {
          wprintf(L"Invalid serial stop bits '%c'\r\n", *p);
+         CloseHandle(hComm);
          exit(1);
       }
    }
@@ -401,6 +407,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
    com_read_status = SetCommState(hComm, &dcbSerialParams);
    if (com_read_status == FALSE) {
       wprintf(L"Error setting com port configuration (2400/7/1/O etc)\r\n");
+      CloseHandle(hComm);
       exit(1);
    } else {
 
@@ -420,6 +427,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
    timeouts.WriteTotalTimeoutMultiplier = 10;
    if (SetCommTimeouts(hComm, &timeouts) == FALSE) {
       wprintf(L"\tError in setting time-outs\r\n");
+      CloseHandle(hComm);
       exit(1);
 
    } else {
@@ -429,6 +437,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
    com_read_status = SetCommMask(hComm, EV_RXCHAR | EV_ERR); // Configure Windows to Monitor the serial device for Character Reception and Errors
    if (com_read_status == FALSE) {
       wprintf(L"\tError in setting CommMask\r\n");
+      CloseHandle(hComm);
       exit(1);
 
    } else {
