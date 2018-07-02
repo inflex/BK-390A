@@ -414,7 +414,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
 
    COMMTIMEOUTS timeouts = {0};
    timeouts.ReadIntervalTimeout = 50;
-   timeouts.ReadTotalTimeoutConstant = 50;
+   timeouts.ReadTotalTimeoutConstant = 500; // ReadFile should wait up to half a second
    timeouts.ReadTotalTimeoutMultiplier = 10;
    timeouts.WriteTotalTimeoutConstant = 50;
    timeouts.WriteTotalTimeoutMultiplier = 10;
@@ -469,8 +469,8 @@ bool auto_detect_port(struct glb *pg) {
             if (g.comms_enabled) {
                enable_coms(&g, com_port); // establish serial communication parameters
             }
-            if (g.debug) { wprintf(L"Waiting for 2s to get a data sample\r\n"); }
-            Sleep(2000); // TODO: is there a more elegant way to do this with WaitCommEvent? It just hangs for me on an incorrect port....
+            //Sleep(2000);
+            //if (g.debug) { wprintf(L"Waiting for 2s to get a data sample\r\n"); }
             // receive data
             if (g.debug) { wprintf(L"DATA START: "); }
             i = 0;
