@@ -940,6 +940,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 		StringCbPrintf(line1, sizeof(line1), L"%-40s", linetmp);
 		StringCbPrintf(line2, sizeof(line2), L"%-40s", mmmode);
 		InvalidateRect(hstatic, NULL, FALSE);
+      UpdateWindow(hstatic);
 
 	} // Windows message loop
 
