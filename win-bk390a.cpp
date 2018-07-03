@@ -474,7 +474,7 @@ bool auto_detect_port(struct glb *pg) {
             if (g.debug) { wprintf(L"Port detected: COM%d\r\n",port); }
             
             snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", port);
-            g.com_address = port;
+            pg->com_address = port;
             if (g.comms_enabled) {
                enable_coms(&g, com_port); // establish serial communication parameters
             }
@@ -652,6 +652,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 	 * Handle the COM Port
 	 */
 	if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
+      if(g.debug) {
+         wprintf(L"Now attempting an auto-detect....\r\n");
+      }
 		if(!auto_detect_port(&g))  { // returning false means auto-detect failed
          wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
          exit(1);
