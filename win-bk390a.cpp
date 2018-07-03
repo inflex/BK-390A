@@ -471,10 +471,9 @@ bool auto_detect_port(struct glb *pg) {
          // it will never be COM1, which is reserved
          if (port != 1) {
             // try to communicate and listen for appropriately-formatted data packet
-            if (g.debug) { wprintf(L"Port detected: COM%d\r\n",port); }
-            
-            snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", port);
             pg->com_address = port;
+            if (g.debug) { wprintf(L"Port detected: COM%d\r\n",port); }
+            snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", port);
             if (g.comms_enabled) {
                enable_coms(&g, com_port); // establish serial communication parameters
             }
