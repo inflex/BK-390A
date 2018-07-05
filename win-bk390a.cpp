@@ -34,6 +34,8 @@
 #define BUILD_DATE " "
 #endif
 
+#define USE_SERIAL 1
+
 //char VERSION[] = BUILD_STR;
 #define BYTE_RANGE 0
 #define BYTE_DIGIT_3 1
@@ -669,19 +671,26 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
    /*
 	 * Handle the COM Port
 	 */
-	if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
+   if(USE_SERIAL) {
+      if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
+         if(g.debug) {
+            wprintf(L"Now attempting an auto-detect....\r\n");
+         }
+         if(!auto_detect_port(&g))  { // returning false means auto-detect failed
+            wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
+            exit(1);
+         }
+         if (g.debug) { wprintf(L"COM%d automatically detected.\r\n",g.com_address); }
+      } else { // the port was specified, so let's try enabling it
+         if (g.comms_enabled) {
+            snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
+            enable_coms(&g, com_port); // establish serial communication parameters
+         }
+      }
+   }
+   else {
       if(g.debug) {
-         wprintf(L"Now attempting an auto-detect....\r\n");
-      }
-		if(!auto_detect_port(&g))  { // returning false means auto-detect failed
-         wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
-         exit(1);
-      }
-      if (g.debug) { wprintf(L"COM%d automatically detected.\r\n",g.com_address); }
-   } else { // the port was specified, so let's try enabling it
-      if (g.comms_enabled) {
-         snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
-         enable_coms(&g, com_port); // establish serial communication parameters
+         wprintf(L"***SIMULATING SERIAL COMMUNICATION***\r\n");
       }
    }
 
@@ -718,8 +727,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 		 * to read the data.
 		 *
 		 */
-		com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); // Wait for the character to be received
-		if (com_read_status == FALSE) {
+		if(USE_SERIAL) {
+         com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); // Wait for the character to be received
+      }
+      
+		if (USE_SERIAL && com_read_status == FALSE) {
 			StringCbPrintf(linetmp, sizeof(linetmp), L"N/C");
 			StringCbPrintf(mmmode, sizeof(mmmode), L"Check RS232");
 
@@ -733,26 +745,40 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			 * from the multimeter.
 			 *
 			 */
+          
+         if(USE_SERIAL) {
+            if (g.debug) { wprintf(L"DATA START: "); }
+            end_of_frame_received = 0;
+            i = 0;
+            do {
+               com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
+               if (bytes_read) {
+                  d[i] = temp_char;
+                  if (g.debug) { wprintf(L"%02x ", d[i]); }
 
-			if (g.debug) { wprintf(L"DATA START: "); }
-			end_of_frame_received = 0;
-			i = 0;
-			do {
-				com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
-				if (bytes_read) {
-					d[i] = temp_char;
-					if (g.debug) { wprintf(L"%02x ", d[i]); }
+                  i++;
 
-			      i++;
+                  if (temp_char == '\n') {
+                     end_of_frame_received = 1;
+                     break;
+                  }
+               }
+            } while ((bytes_read > 0) && (i < sizeof(d)));
 
-					if (temp_char == '\n') {
-						end_of_frame_received = 1;
-						break;
-					}
-				}
-			} while ((bytes_read > 0) && (i < sizeof(d)));
-
-			if (g.debug) { wprintf(L":END [%d bytes]\r\n", i); }
+            if (g.debug) { wprintf(L":END [%d bytes]\r\n", i); }
+         }
+         else {
+            d[BYTE_RANGE] = 0x30; // 000.0 format in resistance mode
+            d[BYTE_DIGIT_3] = 0x34; // 4
+            d[BYTE_DIGIT_2] = 0x33; // 3
+            d[BYTE_DIGIT_1] = 0x32; // 2
+            d[BYTE_DIGIT_0] = 0x31; // 1
+            d[BYTE_FUNCTION] = 0x33; // resistance mode
+            d[BYTE_STATUS] = 0x30; // no judge, no - sign, batt not low, not overloading
+            d[BYTE_OPTION_1] = 0x30;
+            d[BYTE_OPTION_2] = 0x30;
+            i = 11;
+         }
 
 			/*
 			 * Validate the received data
