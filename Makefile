@@ -2,8 +2,10 @@
 # VERSION CHANGES
 #
 
+BV=$(shell (git rev-list HEAD --count))
+BD=$(shell (date))
 LOCATION=/usr/local
-CFLAGS=-O
+CFLAGS=-O -DBUILD_VER="$(BV)"  -DBUILD_DATE=\""$(BD)"\"
 LIBS=
 WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32
 WINCC=i686-w64-mingw32-g++
@@ -27,6 +29,8 @@ default:
 all: ${OBJ} 
 
 win-bk390a: ${OFILES} win-bk390a.cpp 
+	@echo Build Release $(BV)
+	@echo Build Date $(BD)
 #	ctags *.[ch]
 #	clear
 	${WINCC} ${CFLAGS} ${WINFLAGS} $(COMPONENTS) win-bk390a.cpp ${OFILES} -o win-bk390a.exe ${LIBS} ${WINLIBS}

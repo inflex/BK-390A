@@ -21,32 +21,20 @@
 #include <unistd.h>
 #include <wchar.h>
 
-char VERSION[] = "v0.7 Beta";
-char help[] = "BK-Precision 390A Multimeter serial data decoder\r\n"
-"By Paul L Daniels / pldaniels@gmail.com\r\n"
-"v0.7 BETA / July 1, 2018\r\n"
-"\r\n"
-" [-p <comport#>] [-s <serial port config>] [-m] [-fn <fontname>] [-fc <#rrggbb>] [-fw <weight>] [-bc <#rrggbb>] [-wx <width>] [-wy <height>] [-d] [-q]\r\n"
-"\r\n"
-"\t-h: This help\r\n"
-"\t-p <comport>: Set the com port for the meter, eg: -p 2\r\n"
-"\t-s <[9600|4800|2400|1200]:[7|8][o|e|n][1|2]>, eg: -s 2400:7o1\r\n"
-"\t-m: show multimeter mode (second line of text)\r\n"
-"\t-z: Font size (default 72, max 256pt)\r\n"
-"\t-fn <font name>: Font name (default 'Andale')\r\n"
-"\t-fc <#rrggbb>: Font colour\r\n"
-"\t-bc <#rrggbb>: Background colour\r\n"
-"\t-fw <weight>: Font weight, typically 100-to-900 range\r\n"
-"\t-wx <width>: Force Window width (normally calculated based on font size)\r\n"
-"\t-wy <height>: Force Window height\r\n"
-"\t-d: debug enabled\r\n"
-"\t-q: quiet output\r\n"
-"\t-v: show version\r\n"
-"\r\n"
-"\tDefaults: -s 2400:7o1 -z 72 -fc #10ff10 -bc #000000 -fw 600\r\n"
-"\r\n"
-"\texample: bk390a.exe -z 120 -p 4 -s 2400:7o1 -m -fc #10ff10 -bc #000000 -wx 480 -wy 60 -fw 600\r\n";
+/*
+ * Should be defined in the Makefile to pass to the compiler from
+ * the github build revision
+ *
+ */
+#ifndef BUILD_VER 
+#define BUILD_VER 000
+#endif
 
+#ifndef BUILD_DATE
+#define BUILD_DATE " "
+#endif
+
+//char VERSION[] = BUILD_STR;
 #define BYTE_RANGE 0
 #define BYTE_DIGIT_3 1
 #define BYTE_DIGIT_2 2
@@ -178,6 +166,37 @@ int init(struct glb *g) {
 	return 0;
 }
 
+void show_help(void) {
+	wprintf(L"BK-Precision 390A Multimeter serial data decoder\r\n"
+"By Paul L Daniels / pldaniels@gmail.com\r\n"
+"Build %d / %s\r\n"
+"\r\n"
+" [-p <comport#>] [-s <serial port config>] [-m] [-fn <fontname>] [-fc <#rrggbb>] [-fw <weight>] [-bc <#rrggbb>] [-wx <width>] [-wy <height>] [-d] [-q]\r\n"
+"\r\n"
+"\t-h: This help\r\n"
+"\t-p <comport>: Set the com port for the meter, eg: -p 2\r\n"
+"\t-s <[9600|4800|2400|1200]:[7|8][o|e|n][1|2]>, eg: -s 2400:7o1\r\n"
+"\t-m: show multimeter mode (second line of text)\r\n"
+"\t-z: Font size (default 72, max 256pt)\r\n"
+"\t-fn <font name>: Font name (default 'Andale')\r\n"
+"\t-fc <#rrggbb>: Font colour\r\n"
+"\t-bc <#rrggbb>: Background colour\r\n"
+"\t-fw <weight>: Font weight, typically 100-to-900 range\r\n"
+"\t-wx <width>: Force Window width (normally calculated based on font size)\r\n"
+"\t-wy <height>: Force Window height\r\n"
+"\t-d: debug enabled\r\n"
+"\t-q: quiet output\r\n"
+"\t-v: show version\r\n"
+"\r\n"
+"\tDefaults: -s 2400:7o1 -z 72 -fc #10ff10 -bc #000000 -fw 600\r\n"
+"\r\n"
+"\texample: bk390a.exe -z 120 -p 4 -s 2400:7o1 -m -fc #10ff10 -bc #000000 -wx 480 -wy 60 -fw 600\r\n"
+		, BUILD_VER
+		, BUILD_DATE 
+		);
+} 
+
+
 /*-----------------------------------------------------------------\
   Date Code:	: 20180127-220258
   Function Name	: parse_parameters
@@ -217,7 +236,7 @@ int parse_parameters(struct glb *g) {
 			/* parameter */
 			switch (argv[i][1]) {
 				case 'h':
-					wprintf(L"Usage: %s", help);
+					show_help();
 					exit(1);
 					break;
 
@@ -291,7 +310,7 @@ int parse_parameters(struct glb *g) {
 				case 'm': g->show_mode = 1; break;
 
 				case 'v':
-							 wprintf(L"%s\r\n", VERSION);
+							 wprintf(L"Build %d\r\n", BUILD_VER);
 							 exit(0);
 							 break;
 
@@ -938,7 +957,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 		} // if com-read status == TRUE
 
 		StringCbPrintf(line1, sizeof(line1), L"%-40s", linetmp);
-		StringCbPrintf(line2, sizeof(line2), L"%-40s", mmmode);
+		StringCbPrintf(line2, sizeof(line2), L"[B%d]%-40s", BUILD_VER, mmmode);
 		InvalidateRect(hstatic, NULL, FALSE);
       UpdateWindow(hstatic);
 
