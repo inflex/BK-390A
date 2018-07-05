@@ -321,7 +321,6 @@ int parse_parameters(struct glb *g) {
 LRESULT CALLBACK WindowProcedure(HWND, UINT, WPARAM, LPARAM);
 
 void enable_coms(struct glb *pg, wchar_t *com_port) {
-   struct glb g = *pg;
    BOOL com_read_status;  // return status of various com port functions
    /*
     * Open the serial port
@@ -338,10 +337,10 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
     * Check the outcome of the attempt to create the handle for the com port
     */
    if (hComm == INVALID_HANDLE_VALUE) {
-      wprintf(L"Error while trying to open com port 'COM%d'\r\n", g.com_address);
+      wprintf(L"Error while trying to open com port 'COM%d'\r\n", pg->com_address);
       exit(1);
    } else {
-      if (!g.quiet) wprintf(L"Port COM%d Opened\r\n", g.com_address);
+      if (!pg->quiet) wprintf(L"Port COM%d Opened\r\n", pg->com_address);
    }
 
    /*
@@ -353,6 +352,8 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
    com_read_status = GetCommState(hComm, &dcbSerialParams); // Retrieve current settings
    if (com_read_status == FALSE) {
       wprintf(L"Error in getting GetCommState()\r\n");
+      CloseHandle(hComm);
+      exit(1);
    }
 
    dcbSerialParams.BaudRate = CBR_2400;
@@ -360,8 +361,8 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
    dcbSerialParams.StopBits = ONESTOPBIT;
    dcbSerialParams.Parity = ODDPARITY;
 
-   if (g.serial_params[0] != '\0') {
-      char *p = g.serial_params;
+   if (pg->serial_params[0] != '\0') {
+      char *p = pg->serial_params;
 
       if (strncmp(p, "9600:", 5) == 0) dcbSerialParams.BaudRate = CBR_9600; // BaudRate = 9600
       else if (strncmp(p, "4800:", 5) == 0) dcbSerialParams.BaudRate = CBR_4800; // BaudRate = 4800
@@ -369,14 +370,16 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
       else if (strncmp(p, "1200:", 5) == 0) dcbSerialParams.BaudRate = CBR_1200; // BaudRate = 1200
       else {
          wprintf(L"Invalid serial speed\r\n");
+         CloseHandle(hComm);
          exit(1);
       }
 
-      p = &(g.serial_params[5]);
+      p = &(pg->serial_params[5]);
       if (*p == '7') dcbSerialParams.ByteSize = 7;
       else if (*p == '8') dcbSerialParams.ByteSize = 8;
       else {
          wprintf(L"Invalid serial byte size '%c'\r\n", *p);
+         CloseHandle(hComm);
          exit(1);
       }
 
@@ -386,6 +389,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
       else if (*p == 'n') dcbSerialParams.Parity = NOPARITY;
       else {
          wprintf(L"Invalid serial parity type '%c'\r\n", *p);
+         CloseHandle(hComm);
          exit(1);
       }
 
@@ -394,6 +398,7 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
       else if (*p == '2') dcbSerialParams.StopBits = TWOSTOPBITS;
       else {
          wprintf(L"Invalid serial stop bits '%c'\r\n", *p);
+         CloseHandle(hComm);
          exit(1);
       }
    }
@@ -401,10 +406,11 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
    com_read_status = SetCommState(hComm, &dcbSerialParams);
    if (com_read_status == FALSE) {
       wprintf(L"Error setting com port configuration (2400/7/1/O etc)\r\n");
+      CloseHandle(hComm);
       exit(1);
    } else {
 
-      if (!g.quiet) {
+      if (!pg->quiet) {
          wprintf(L"\tBaudrate = %ld\r\n", dcbSerialParams.BaudRate);
          wprintf(L"\tByteSize = %ld\r\n", dcbSerialParams.ByteSize);
          wprintf(L"\tStopBits = %d\r\n", dcbSerialParams.StopBits);
@@ -414,31 +420,32 @@ void enable_coms(struct glb *pg, wchar_t *com_port) {
 
    COMMTIMEOUTS timeouts = {0};
    timeouts.ReadIntervalTimeout = 50;
-   timeouts.ReadTotalTimeoutConstant = 50;
+   timeouts.ReadTotalTimeoutConstant = 1000; // ReadFile should wait up to one second
    timeouts.ReadTotalTimeoutMultiplier = 10;
    timeouts.WriteTotalTimeoutConstant = 50;
    timeouts.WriteTotalTimeoutMultiplier = 10;
    if (SetCommTimeouts(hComm, &timeouts) == FALSE) {
       wprintf(L"\tError in setting time-outs\r\n");
+      CloseHandle(hComm);
       exit(1);
 
    } else {
-      if (!g.quiet) { wprintf(L"\tSetting time-outs successful\r\n"); }
+      if (!pg->quiet) { wprintf(L"\tSetting time-outs successful\r\n"); }
    }
 
    com_read_status = SetCommMask(hComm, EV_RXCHAR | EV_ERR); // Configure Windows to Monitor the serial device for Character Reception and Errors
    if (com_read_status == FALSE) {
       wprintf(L"\tError in setting CommMask\r\n");
+      CloseHandle(hComm);
       exit(1);
 
    } else {
-      if (!g.quiet) { wprintf(L"\tCommMask successful\r\n"); }
+      if (!pg->quiet) { wprintf(L"\tCommMask successful\r\n"); }
    }
 }
 
 // Based on code from: https://bytes.com/topic/net/answers/666485-trying-retrieve-list-active-serial-com-ports-c
 bool auto_detect_port(struct glb *pg) {
-   struct glb g = *pg;
    TCHAR szDevices[65535];
    unsigned long dwChars = QueryDosDevice(NULL, szDevices, 65535);
    TCHAR *ptr = szDevices;
@@ -462,22 +469,19 @@ bool auto_detect_port(struct glb *pg) {
          // it will never be COM1, which is reserved
          if (port != 1) {
             // try to communicate and listen for appropriately-formatted data packet
-            if (g.debug) { wprintf(L"Port detected: COM%d\r\n",port); }
-            
+            pg->com_address = port;
+            if (pg->debug) { wprintf(L"Port detected: COM%d\r\n",port); }
             snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", port);
-            g.com_address = port;
-            if (g.comms_enabled) {
-               enable_coms(&g, com_port); // establish serial communication parameters
+            if (pg->comms_enabled) {
+               enable_coms(pg, com_port); // establish serial communication parameters
             }
-            if (g.debug) { wprintf(L"Waiting for 2s to get a data sample\r\n"); }
-            Sleep(2000); // TODO: is there a more elegant way to do this with WaitCommEvent? It just hangs for me on an incorrect port....
-            // receive data
-            if (g.debug) { wprintf(L"DATA START: "); }
+
+            if (pg->debug) { wprintf(L"DATA START: "); }
             i = 0;
             do {
                com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
                d[i] = temp_char;
-               if (g.debug) { wprintf(L"%02x ", d[i]); }
+               if (pg->debug) { wprintf(L"%02x ", d[i]); }
                i++;
                
                if (temp_char == '\n') {
@@ -486,12 +490,14 @@ bool auto_detect_port(struct glb *pg) {
                }
             } while ((bytes_read > 0) && (i < sizeof(d)));
             
-            if (g.debug) { wprintf(L":END\r\n"); }
+            if (pg->debug) { wprintf(L":END\r\n"); }
             
             // see if data is valid with 2 checks
             // #1 - length check
             if(i == DATA_FRAME_SIZE) {
-               if (g.debug) { wprintf(L"LENGTH CHECK: SUCCESS\r\n"); }
+               if (pg->debug) {
+                  wprintf(L"LENGTH CHECK: SUCCESS\r\n");
+               }
                // #2 - check to see if the data fits the protocol
                switch (d[BYTE_FUNCTION]) {
                   case FUNCTION_VOLTAGE:
@@ -504,39 +510,28 @@ bool auto_detect_port(struct glb *pg) {
                   case FUNCTION_FQ_RPM:
                   case FUNCTION_CAPACITANCE:
                   case FUNCTION_TEMPERATURE:
-                     if (g.debug) { wprintf(L"DATA FORMAT CHECK: SUCCESS\r\n"); }
+                     if (pg->debug) {
+                        wprintf(L"DATA FORMAT CHECK: SUCCESS\r\n");
+                     }
                      return true; // passed our check
                }
                
-					/*
-					 * FIXME 
-					 * What's going on with this code?
-					 *
-					 * Are you meant to be including the if (--attempts...) code in the g.debug?
-					 *
-					 * Prefer to do any changes to variables before or outside of the if() tests
-					 * so as to avoid any ambiguities or unexpected side-effects, particularly if
-					 * the tests get shuffled around later.
-					 *
-					 *
-					 */
-               if (g.debug) {
+               if (pg->debug) {
                   wprintf(L"DATA FORMAT CHECK: FAIL\r\n");
-						attempts_remaining--;
-                  if(attempts_remaining > 0) continue; // try again from the top. same port.
                } // if debug
+               attempts_remaining--;
+               if(attempts_remaining > 0) {
+                  continue; // try again from the top. same port.
+               }
 
             } else {
-               if (g.debug) {
+               if (pg->debug) {
                   wprintf(L"LENGTH CHECK: FAIL\r\n");
-						attempts_remaining--;
-                  if(attempts_remaining > 0) continue; // try again from the top. same port.
                } // if debug
-					/*
-					 * ---END of confusing code section
-					 * FIXME
-					 *
-					 */
+               attempts_remaining--;
+               if(attempts_remaining > 0) {
+                  continue; // try again from the top. same port.
+               }
             }
          }
       }
@@ -607,22 +602,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 	parse_parameters(&g);
 
 	/*
-	 * Sanity check our parameters
-	 */
-	if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
-		if(!auto_detect_port(&g))  { // returning false means auto-detect failed
-         wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
-         exit(1);
-      }
-      if (g.debug) { wprintf(L"COM%d automatically detected.\r\n",g.com_address); }
-   } else { // the port was specified, so let's try enabling it
-      if (g.comms_enabled) {
-         snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
-         enable_coms(&g, com_port); // establish serial communication parameters
-      }
-   }
-
-	/*
 	 *
 	 * Now do all the Windows GDI stuff
 	 *
@@ -668,6 +647,24 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 
 	hstatic = CreateWindowW(wc.lpszClassName, L"BK-390A Meter", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 50, 50, g.window_x, g.window_y, NULL, NULL, hInstance, NULL);
 
+   /*
+	 * Handle the COM Port
+	 */
+	if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
+      if(g.debug) {
+         wprintf(L"Now attempting an auto-detect....\r\n");
+      }
+		if(!auto_detect_port(&g))  { // returning false means auto-detect failed
+         wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
+         exit(1);
+      }
+      if (g.debug) { wprintf(L"COM%d automatically detected.\r\n",g.com_address); }
+   } else { // the port was specified, so let's try enabling it
+      if (g.comms_enabled) {
+         snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
+         enable_coms(&g, com_port); // establish serial communication parameters
+      }
+   }
 
 	/*
 	 * Keep reading, interpreting and converting data until someone
@@ -943,6 +940,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 		StringCbPrintf(line1, sizeof(line1), L"%-40s", linetmp);
 		StringCbPrintf(line2, sizeof(line2), L"%-40s", mmmode);
 		InvalidateRect(hstatic, NULL, FALSE);
+      UpdateWindow(hstatic);
 
 	} // Windows message loop
 

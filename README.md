@@ -57,7 +57,7 @@ The program will display in text the current meter display and also generate a t
 
         Defaults: -s 2400:7o1 -z 72 -fc #10ff10 -bc #000000 -fw 600 -fn Andale
 
-        example: bk390a.exe -z 120 -p 4 -m -fc #ff1010 -bc #000000 -fw 600
+        example: win-bk390a.exe -z 120 -p 4 -m -fc #ff1010 -bc #000000 -fw 600
 
 
 
