@@ -982,11 +982,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			}
 		} // if com-read status == TRUE
 
-		StringCbPrintf(line1, sizeof(line1), L"%s", linetmp);
-		//StringCbPrintf(line2, sizeof(line2), L"[B%d]%-40s", BUILD_VER, mmmode);
-      StringCbPrintf(line2, sizeof(line2), L"%s", mmmode);
       StringCbPrintf(line0, sizeof(line0), L"[B%d]", BUILD_VER);
-		//InvalidateRect(hstatic, NULL, FALSE);
+		StringCbPrintf(line1, sizeof(line1), L"%s", linetmp);
+      StringCbPrintf(line2, sizeof(line2), L"%s", mmmode);
       UpdateWindow(hstatic);
 
 	} // Windows message loop
