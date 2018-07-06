@@ -2,7 +2,9 @@
 # VERSION CHANGES
 #
 
-CFLAGS=-O
+BV=$(shell (git rev-list HEAD --count))
+BD=$(shell (date))
+CFLAGS=-O -DBUILD_VER="$(BV)"  -DBUILD_DATE=\""$(BD)"\"
 LIBS=
 WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32 -lwinspool
 CC=gcc
@@ -18,7 +20,9 @@ default:
 	@echo "   For GUI tool: make win-bk390a"
 	@echo
 
-win-bk390a: win-bk390a.cpp 
+win-bk390a: win-bk390a.cpp
+	@echo Build Release $(BV)
+	@echo Build Date $(BD)
 	${GCC} ${CFLAGS} ${WINFLAGS} $(COMPONENTS) win-bk390a.cpp ${OFILES} -o ${WINOBJ} ${LIBS} ${WINLIBS}
 
 bk390a: bk390a.c 
