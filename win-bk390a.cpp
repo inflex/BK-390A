@@ -670,7 +670,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
    /*
 	 * Handle the COM Port
 	 */
+#if FAKE_SERIAL == 1
+	if (0) {
+#else 
 	if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
+#endif
       if(g.debug) {
          wprintf(L"Now attempting an auto-detect....\r\n");
       }

@@ -4,7 +4,7 @@
 
 BV=$(shell (git rev-list HEAD --count))
 BD=$(shell (date))
-CFLAGS=-O -DBUILD_VER="$(BV)"  -DBUILD_DATE=\""$(BD)"\"
+CFLAGS=-O -DBUILD_VER="$(BV)" -DBUILD_DATE=\""$(BD)"\" -DFAKE_SERIAL=$(FAKE_SERIAL)
 LIBS=
 WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32 -lwinspool
 CC=gcc
