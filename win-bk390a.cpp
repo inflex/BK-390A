@@ -681,7 +681,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
    } else { // the port was specified, so let's try enabling it
       if (g.comms_enabled) {
          snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
+#if FAKE_SERIAL == 0
          enable_coms(&g, com_port); // establish serial communication parameters
+#endif
       }
    }
 
@@ -718,10 +720,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 		 * to read the data.
 		 *
 		 */
+#if FAKE_SERIAL == 1
+		if (0) {
+#else
 		com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); // Wait for the character to be received
 		if (com_read_status == FALSE) {
 			StringCbPrintf(linetmp, sizeof(linetmp), L"N/C");
 			StringCbPrintf(mmmode, sizeof(mmmode), L"Check RS232");
+#endif
 
 		} else {
 			/*
@@ -734,6 +740,18 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			 *
 			 */
 
+#if FAKE_SERIAL == 1
+            d[BYTE_RANGE] = 0x30; // 000.0 format in resistance mode
+            d[BYTE_DIGIT_3] = 0x34; // 4
+            d[BYTE_DIGIT_2] = 0x33; // 3
+            d[BYTE_DIGIT_1] = 0x32; // 2
+            d[BYTE_DIGIT_0] = 0x31; // 1
+            d[BYTE_FUNCTION] = 0x33; // resistance mode
+            d[BYTE_STATUS] = 0x30; // no judge, no - sign, batt not low, not overloading
+            d[BYTE_OPTION_1] = 0x30;
+            d[BYTE_OPTION_2] = 0x30;
+				i = DATA_FRAME_SIZE;
+#else
 			if (g.debug) { wprintf(L"DATA START: "); }
 			end_of_frame_received = 0;
 			i = 0;
@@ -753,6 +771,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			} while ((bytes_read > 0) && (i < sizeof(d)));
 
 			if (g.debug) { wprintf(L":END [%d bytes]\r\n", i); }
+#endif
 
 			/*
 			 * Validate the received data
