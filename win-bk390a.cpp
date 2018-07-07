@@ -979,7 +979,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 
 		StringCbPrintf(line1, sizeof(line1), L"%-40s", linetmp);
 		StringCbPrintf(line2, sizeof(line2), L"%-40s", mmmode);
-		StringCbPrintf(line3, sizeof(line3), L"[BUILD %d]", BUILD_VER);
+		StringCbPrintf(line3, sizeof(line3), L"V.%03d", BUILD_VER);
 		InvalidateRect(hstatic, NULL, FALSE);
       UpdateWindow(hstatic);
 
