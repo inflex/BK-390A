@@ -985,6 +985,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
       StringCbPrintf(line0, sizeof(line0), L"[B%d]", BUILD_VER);
 		StringCbPrintf(line1, sizeof(line1), L"%s", linetmp);
       StringCbPrintf(line2, sizeof(line2), L"%s", mmmode);
+      InvalidateRect(hstatic, NULL, FALSE);
       UpdateWindow(hstatic);
 
 	} // Windows message loop
