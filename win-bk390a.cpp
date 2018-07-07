@@ -778,6 +778,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
             d[BYTE_OPTION_1] = 0x30;
             d[BYTE_OPTION_2] = 0x30;
             i = 11;
+            Sleep(100);
          }
 
 			/*
