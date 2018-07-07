@@ -1021,7 +1021,7 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 			TextOutW(hdc, smallfontmetrics.tmAveCharWidth, fontmetrics.tmAscent * 1.1, line2, wcslen(line2));
 
 			holdFont = (HFONT)SelectObject(hdc, hFontBg);
-			TextOutW(hdc,  (wrect.right -wrect.left) -(smallfontmetrics.tmAveCharWidth *14), fontmetrics.tmAscent * 1.1, line3, wcslen(line3));
+			TextOutW(hdc,  (wrect.right -wrect.left) -(smallfontmetrics.tmAveCharWidth *9), fontmetrics.tmAscent * 1.1, line3, wcslen(line3));
 
 			EndPaint(hwnd, &ps);
 			break;
