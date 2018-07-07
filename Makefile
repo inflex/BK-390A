@@ -25,6 +25,8 @@ default:
 	@echo "   For OBS command line tool: make bk390a"
 	@echo "   For GUI tool: make win-bk390a"
 	@echo
+	@echo "   To make a GUI test, export FAKE_SERIAL=1 && make win-bk390a"
+	@echo
 
 .c.o:
 	${CC} ${CFLAGS} $(COMPONENTS) -c $*.c

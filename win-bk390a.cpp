@@ -127,6 +127,7 @@ TEXTMETRIC fontmetrics, smallfontmetrics;
 
 wchar_t line1[SSIZE];
 wchar_t line2[SSIZE];
+wchar_t line3[SSIZE];
 struct glb *glbs;
 
 /*-----------------------------------------------------------------\
@@ -741,16 +742,17 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			 */
 
 #if FAKE_SERIAL == 1
-            d[BYTE_RANGE] = 0x30; // 000.0 format in resistance mode
+            d[BYTE_RANGE] = 0x31; // 000.0 format in resistance mode
             d[BYTE_DIGIT_3] = 0x34; // 4
             d[BYTE_DIGIT_2] = 0x33; // 3
             d[BYTE_DIGIT_1] = 0x32; // 2
             d[BYTE_DIGIT_0] = 0x31; // 1
             d[BYTE_FUNCTION] = 0x33; // resistance mode
-            d[BYTE_STATUS] = 0x30; // no judge, no - sign, batt not low, not overloading
+            d[BYTE_STATUS] = 0x30 | STATUS_SIGN; // no judge, no - sign, batt not low, not overloading
             d[BYTE_OPTION_1] = 0x30;
             d[BYTE_OPTION_2] = 0x30;
 				i = DATA_FRAME_SIZE;
+				usleep(500000);
 #else
 			if (g.debug) { wprintf(L"DATA START: "); }
 			end_of_frame_received = 0;
@@ -976,7 +978,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 		} // if com-read status == TRUE
 
 		StringCbPrintf(line1, sizeof(line1), L"%-40s", linetmp);
-		StringCbPrintf(line2, sizeof(line2), L"[B%d]%-40s", BUILD_VER, mmmode);
+		StringCbPrintf(line2, sizeof(line2), L"%-40s", mmmode);
+		StringCbPrintf(line3, sizeof(line3), L"[BUILD %d]", BUILD_VER);
 		InvalidateRect(hstatic, NULL, FALSE);
       UpdateWindow(hstatic);
 
@@ -998,6 +1001,9 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 		case WM_PAINT:
 			HDC hdc;
 			PAINTSTRUCT ps;
+			RECT wrect;
+			GetWindowRect( hwnd, &wrect ); 
+
 			hdc = BeginPaint(hwnd, &ps);
 			SetBkColor(hdc, glbs->background_color);
 			SetTextColor(hdc, glbs->font_color);
@@ -1007,6 +1013,9 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 
 			holdFont = (HFONT)SelectObject(hdc, hFontBg);
 			TextOutW(hdc, smallfontmetrics.tmAveCharWidth, fontmetrics.tmAscent * 1.1, line2, wcslen(line2));
+
+			holdFont = (HFONT)SelectObject(hdc, hFontBg);
+			TextOutW(hdc,  (wrect.right -wrect.left) -(smallfontmetrics.tmAveCharWidth *14), fontmetrics.tmAscent * 1.1, line3, wcslen(line3));
 
 			EndPaint(hwnd, &ps);
 			break;
