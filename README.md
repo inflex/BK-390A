@@ -52,6 +52,7 @@ The program will display in text the current meter display and also generate a t
         -wx <width>: Force Window width (normally calculated based on font size)
         -wy <height>: Force Window height
         -d: debug enabled
+        -c: disable serial communication. useful for GUI preview
         -q: quiet output
         -v: show version
 

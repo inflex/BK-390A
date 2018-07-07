@@ -125,6 +125,7 @@ HWND hstatic;
 HBRUSH BBrush; // = CreateSolidBrush(RGB(0,0,0));
 TEXTMETRIC fontmetrics, smallfontmetrics;
 
+wchar_t line0[SSIZE];
 wchar_t line1[SSIZE];
 wchar_t line2[SSIZE];
 struct glb *glbs;
@@ -185,6 +186,7 @@ void show_help(void) {
 "\t-wx <width>: Force Window width (normally calculated based on font size)\r\n"
 "\t-wy <height>: Force Window height\r\n"
 "\t-d: debug enabled\r\n"
+"\t-c: disable serial communication. useful for GUI preview\r\n"
 "\t-q: quiet output\r\n"
 "\t-v: show version\r\n"
 "\r\n"
@@ -639,7 +641,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 
 	RegisterClassW(&wc);
 
-	/*
+	hstatic = CreateWindowW(wc.lpszClassName, L"BK-390A Meter", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 50, 50, g.window_x, g.window_y, NULL, NULL, hInstance, NULL);
+   
+   /*
 	 *
 	 * Create fonts and get their metrics/sizes
 	 *
@@ -655,33 +659,38 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			g.font_name);
 	holdFont = (HFONT)SelectObject(dc, hFontBg);
 	GetTextMetrics(dc, &smallfontmetrics);
-
-	/*
+   
+   /*
 	 * If the user hasn't explicitly set a window size
 	 * then we will try to determine a size based on our
 	 * font metrics
 	 */
 	if (g.window_x == DEFAULT_WINDOW_WIDTH) g.window_x = fontmetrics.tmAveCharWidth * 9;
 	if (g.window_y == DEFAULT_WINDOW_HEIGHT) g.window_y = ((((fontmetrics.tmAscent) + smallfontmetrics.tmHeight + metrics.iCaptionHeight) * GetDeviceCaps(dc, LOGPIXELSY)) / WINDOWS_DPI_DEFAULT);
-
-	hstatic = CreateWindowW(wc.lpszClassName, L"BK-390A Meter", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 50, 50, g.window_x, g.window_y, NULL, NULL, hInstance, NULL);
+   
+   SetWindowPos(hstatic,HWND_TOP,50,50,g.window_x,g.window_y,(UINT)0);
 
    /*
 	 * Handle the COM Port
 	 */
-	if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
-      if(g.debug) {
-         wprintf(L"Now attempting an auto-detect....\r\n");
-      }
-		if(!auto_detect_port(&g))  { // returning false means auto-detect failed
-         wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
-         exit(1);
-      }
-      if (g.debug) { wprintf(L"COM%d automatically detected.\r\n",g.com_address); }
-   } else { // the port was specified, so let's try enabling it
-      if (g.comms_enabled) {
+   if(g.comms_enabled) {
+      if (g.com_address == DEFAULT_COM_PORT) { // no port was specified, so attempt an auto-detect
+         if(g.debug) {
+            wprintf(L"Now attempting an auto-detect....\r\n");
+         }
+         if(!auto_detect_port(&g))  { // returning false means auto-detect failed
+            wprintf(L"Failed to automatically detect COM port. Perhaps try using -p?\r\n");
+            exit(1);
+         }
+         if (g.debug) { wprintf(L"COM%d automatically detected.\r\n",g.com_address); }
+      } else { // the port was specified, so let's try enabling it
          snwprintf(com_port, sizeof(com_port), L"\\\\.\\COM%d", g.com_address);
          enable_coms(&g, com_port); // establish serial communication parameters
+      }
+   }
+   else {
+      if(g.debug) {
+         wprintf(L"***SIMULATING SERIAL COMMUNICATION***\r\n");
       }
    }
 
@@ -718,8 +727,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 		 * to read the data.
 		 *
 		 */
-		com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); // Wait for the character to be received
-		if (com_read_status == FALSE) {
+		if(g.comms_enabled) {
+         com_read_status = WaitCommEvent(hComm, &dwEventMask, NULL); // Wait for the character to be received
+      }
+      
+		if (g.comms_enabled && com_read_status == FALSE) {
 			StringCbPrintf(linetmp, sizeof(linetmp), L"N/C");
 			StringCbPrintf(mmmode, sizeof(mmmode), L"Check RS232");
 
@@ -733,26 +745,41 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			 * from the multimeter.
 			 *
 			 */
+          
+         if(g.comms_enabled) {
+            if (g.debug) { wprintf(L"DATA START: "); }
+            end_of_frame_received = 0;
+            i = 0;
+            do {
+               com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
+               if (bytes_read) {
+                  d[i] = temp_char;
+                  if (g.debug) { wprintf(L"%02x ", d[i]); }
 
-			if (g.debug) { wprintf(L"DATA START: "); }
-			end_of_frame_received = 0;
-			i = 0;
-			do {
-				com_read_status = ReadFile(hComm, &temp_char, sizeof(temp_char), &bytes_read, NULL);
-				if (bytes_read) {
-					d[i] = temp_char;
-					if (g.debug) { wprintf(L"%02x ", d[i]); }
+                  i++;
 
-			      i++;
+                  if (temp_char == '\n') {
+                     end_of_frame_received = 1;
+                     break;
+                  }
+               }
+            } while ((bytes_read > 0) && (i < sizeof(d)));
 
-					if (temp_char == '\n') {
-						end_of_frame_received = 1;
-						break;
-					}
-				}
-			} while ((bytes_read > 0) && (i < sizeof(d)));
-
-			if (g.debug) { wprintf(L":END [%d bytes]\r\n", i); }
+            if (g.debug) { wprintf(L":END [%d bytes]\r\n", i); }
+         }
+         else {
+            d[BYTE_RANGE] = 0x30; // 000.0 format in resistance mode
+            d[BYTE_DIGIT_3] = 0x34; // 4
+            d[BYTE_DIGIT_2] = 0x33; // 3
+            d[BYTE_DIGIT_1] = 0x32; // 2
+            d[BYTE_DIGIT_0] = 0x31; // 1
+            d[BYTE_FUNCTION] = 0x33; // resistance mode
+            d[BYTE_STATUS] = 0x30; // no judge, no - sign, batt not low, not overloading
+            d[BYTE_OPTION_1] = 0x30;
+            d[BYTE_OPTION_2] = 0x30;
+            i = 11;
+            Sleep(100);
+         }
 
 			/*
 			 * Validate the received data
@@ -956,9 +983,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			}
 		} // if com-read status == TRUE
 
-		StringCbPrintf(line1, sizeof(line1), L"%-40s", linetmp);
-		StringCbPrintf(line2, sizeof(line2), L"[B%d]%-40s", BUILD_VER, mmmode);
-		InvalidateRect(hstatic, NULL, FALSE);
+      StringCbPrintf(line0, sizeof(line0), L"[B%d]", BUILD_VER);
+		StringCbPrintf(line1, sizeof(line1), L"%s", linetmp);
+      StringCbPrintf(line2, sizeof(line2), L"%s", mmmode);
+      InvalidateRect(hstatic, NULL, FALSE);
       UpdateWindow(hstatic);
 
 	} // Windows message loop
@@ -988,6 +1016,8 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 
 			holdFont = (HFONT)SelectObject(hdc, hFontBg);
 			TextOutW(hdc, smallfontmetrics.tmAveCharWidth, fontmetrics.tmAscent * 1.1, line2, wcslen(line2));
+         
+         TextOutW(hdc, 0, 0, line0, wcslen(line0));
 
 			EndPaint(hwnd, &ps);
 			break;
