@@ -14,7 +14,8 @@ WINLIBS=-lgdi32 -lcomdlg32 -lcomctl32 -lmingw32
 WINCC=i686-w64-mingw32-g++
 # -fpermissive is needed to stop the warnings about casting stoppping the build
 # -municode eliminates the WinMain@16 link error when we're using wWinMain
-WINFLAGS=-municode -static-libgcc -fpermissive -static-libstdc++
+#WINFLAGS=-municode -static-libgcc -fpermissive -static-libstdc++
+WINFLAGS=-municode -static-libgcc -static-libstdc++
 
 OBJ=bk390a
 WINOBJ=win-bk390a.exe
