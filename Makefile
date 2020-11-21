@@ -23,7 +23,6 @@ OFILES=
 
 default: 
 	@echo
-	@echo "   For OBS command line tool: make bk390a"
 	@echo "   For GUI tool: make win-bk390a"
 	@echo
 	@echo "   To make a GUI test, export FAKE_SERIAL=1 && make win-bk390a"
@@ -37,20 +36,10 @@ all: ${OBJ}
 win-bk390a: ${OFILES} win-bk390a.cpp 
 	@echo Build Release $(BV)
 	@echo Build Date $(BD)
-#	ctags *.[ch]
-#	clear
 	${WINCC} ${CFLAGS} ${WINFLAGS} $(COMPONENTS) win-bk390a.cpp ${OFILES} -o win-bk390a.exe ${LIBS} ${WINLIBS}
-
-bk390a: ${OFILES} bk390a.c 
-#	ctags *.[ch]
-#	clear
-	${CC} ${CFLAGS} $(COMPONENTS) bk390a.c ${OFILES} -o bk390a.exe ${LIBS}
 
 strip: 
 	strip *.exe
-
-install: ${OBJ}
-	cp bk390a win-bk390a ${LOCATION}/bin/
 
 clean:
 	rm -f *.o *core ${OBJ} ${WINOBJ}

@@ -1,0 +1,25 @@
+# 
+# VERSION CHANGES
+#
+
+BV=$(shell (git rev-list HEAD --count))
+BD=$(shell (date))
+SDLFLAGS=$(shell (sdl2-config --static-libs --cflags))
+CFLAGS= -ggdb -O -DBUILD_VER="$(BV)" -DBUILD_DATE=\""$(BD)"\" -DFAKE_SERIAL=$(FAKE_SERIAL)
+LIBS=-lSDL2_ttf
+CC=gcc
+GCC=g++
+
+OBJ=bk390-sdl2
+
+default: $(OBJ)
+	@echo
+	@echo
+
+bk390-sdl2: bk390-sdl2.cpp
+	@echo Build Release $(BV)
+	@echo Build Date $(BD)
+	${GCC} ${CFLAGS} $(COMPONENTS) bk390-sdl2.cpp $(SDLFLAGS) $(LIBS) ${OFILES} -o ${OBJ} 
+
+clean:
+	del /s ${OBJ} ${WINOBJ}
