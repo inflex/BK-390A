@@ -571,7 +571,6 @@ int main ( int argc, char **argv ) {
 		fprintf(stderr,"Error trying to open font (RobotoMono-Regular.ttf)  :(\n");
 		exit(1);
 	}
-	SDL_RWclose(s);
 
 	/*
 	 * Get the required window size.
@@ -968,6 +967,7 @@ int main ( int argc, char **argv ) {
 	SDL_DestroyTexture(texture);
 	SDL_FreeSurface(surface);
 	TTF_CloseFont(font);
+	SDL_RWclose(s);
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	TTF_Quit();
