@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <X11/Xlib.h>
+#include "robotomono.h"
 
 #define FL __FILE__,__LINE__
 
@@ -563,12 +564,14 @@ int main ( int argc, char **argv ) {
 	 */
 
 	SDL_Init(SDL_INIT_VIDEO);
+	SDL_RWops *s = SDL_RWFromMem( (void *)RobotoMono_Regular_ttf, sizeof(RobotoMono_Regular_ttf));
 	TTF_Init();
-	TTF_Font *font = TTF_OpenFont("RobotoMono-Regular.ttf", g.font_size);
+	TTF_Font *font = TTF_OpenFontRW( s, 0, g.font_size ); 
 	if (!font) {
 		fprintf(stderr,"Error trying to open font (RobotoMono-Regular.ttf)  :(\n");
 		exit(1);
 	}
+	SDL_RWclose(s);
 
 	/*
 	 * Get the required window size.
