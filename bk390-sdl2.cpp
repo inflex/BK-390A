@@ -565,6 +565,10 @@ int main ( int argc, char **argv ) {
 	SDL_Init(SDL_INIT_VIDEO);
 	TTF_Init();
 	TTF_Font *font = TTF_OpenFont("RobotoMono-Regular.ttf", g.font_size);
+	if (!font) {
+		fprintf(stderr,"Error trying to open font (RobotoMono-Regular.ttf)  :(\n");
+		exit(1);
+	}
 
 	/*
 	 * Get the required window size.
@@ -578,10 +582,6 @@ int main ( int argc, char **argv ) {
 
 	SDL_Window *window = SDL_CreateWindow("BK390A Multimeter OSD", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, g.window_width, g.window_height, 0);
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
-	if (!font) {
-		fprintf(stderr,"Error trying to open font :( \r\n");
-		exit(1);
-	}
 
 	/* Select the color for drawing. It is set to red here. */
 	SDL_SetRenderDrawColor(renderer, g.background_color.r, g.background_color.g, g.background_color.b, 255 );
