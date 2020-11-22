@@ -138,6 +138,7 @@ struct glb {
 	char *com_address;
 	char *output_file;
 
+	char *serial_parameters_string;
 	struct serial_params_s serial_params;
 
 	int font_size;
@@ -302,6 +303,7 @@ int parse_parameters(struct glb *g, int argc, char **argv ) {
 							 exit(0);
 							 break;
 
+							 /*
 				case 'f':
 							 if (argv[i][2] == 'c') {
 								 i++;
@@ -324,6 +326,7 @@ int parse_parameters(struct glb *g, int argc, char **argv ) {
 										 );
 							 }
 							 break;
+							 */
 
 				case 'w':
 							 if (argv[i][2] == 'x') {
@@ -336,6 +339,8 @@ int parse_parameters(struct glb *g, int argc, char **argv ) {
 							 break;
 
 				case 's':
+							 i++;
+							 g->serial_parameters_string = argv[i];
 							 // Not needed, we hard code at 2400-8n1 because
 							 // that's what these meters should be doing.  
 							 //
@@ -355,12 +360,13 @@ int parse_parameters(struct glb *g, int argc, char **argv ) {
 
 /*
  *
- * Default parameters are 2400:8n1, given that the multimeter
+ * Default parameters are 2400:7none1, given that the multimeter
  * is shipped like this and cannot be changed then we shouldn't
  * have to worry about needing to make changes, but we'll probably
  * add that for future changes.
  *
  */
+/*
 void open_port(struct serial_params_s *s) {
 	int r; 
 
@@ -373,14 +379,119 @@ void open_port(struct serial_params_s *s) {
 	tcgetattr(s->fd,&(s->oldtp)); // save current serial port settings 
 	tcgetattr(s->fd,&(s->newtp)); // save current serial port settings in to what will be our new settings
 	cfmakeraw(&(s->newtp));
-	s->newtp.c_cflag = B2400 | CS8 |  CREAD | CRTSCTS ; // Adjust the settings to suit our BK390A / 2400-8n1
+	s->newtp.c_cflag = B2400 | CS7 | PARODD | CREAD | CRTSCTS ; // Adjust the settings to suit our BK390A / 2400-7o1
 
+	cfsetospeed(&s->newtp, B2400);
+	cfsetispeed(&s->newtp, B2400);
 	r = tcsetattr(s->fd, TCSANOW, &(s->newtp));
 	if (r) {
 		fprintf(stderr,"%s:%d: Error setting terminal (%s)\n", FL, strerror(errno));
 		exit(1);
 	}
 }
+*/
+
+
+/*
+ * Default parameters are 2400:8n1, given that the multimeter
+ * is shipped like this and cannot be changed then we shouldn't
+ * have to worry about needing to make changes, but we'll probably
+ * add that for future changes.
+ *
+ */
+void open_port( struct glb *g ) {
+#ifdef __linux__
+	struct serial_params_s *s = &(g->serial_params);
+	char *p = g->serial_parameters_string;
+	char default_params[] = "2400:7o1";
+	int r; 
+
+	if (!p) p = default_params;
+
+	fprintf(stdout,"Attempting to open '%s'\n", s->device);
+	s->fd = open( s->device, O_RDWR | O_NOCTTY | O_NDELAY );
+	if (s->fd <0) {
+		perror( s->device );
+	}
+
+	fcntl(s->fd,F_SETFL,0);
+	tcgetattr(s->fd,&(s->oldtp)); // save current serial port settings 
+	tcgetattr(s->fd,&(s->newtp)); // save current serial port settings in to what will be our new settings
+	cfmakeraw(&(s->newtp));
+
+	s->newtp.c_cflag = CLOCAL | CREAD ; 
+
+	if (strncmp(p, "115200:", 7) == 0) s->newtp.c_cflag |= B115200; 
+	else if (strncmp(p, "57600:", 6) == 0) s->newtp.c_cflag |= B57600;
+	else if (strncmp(p, "38400:", 6) == 0) s->newtp.c_cflag |= B38400;
+	else if (strncmp(p, "19200:", 6) == 0) s->newtp.c_cflag |= B19200;
+	else if (strncmp(p, "9600:", 5) == 0) s->newtp.c_cflag |= B9600;
+	else if (strncmp(p, "4800:", 5) == 0) s->newtp.c_cflag |= B4800;
+	else if (strncmp(p, "2400:", 5) == 0) s->newtp.c_cflag |= B2400; //
+	else {
+		fprintf(stdout,"Invalid serial speed\r\n");
+		exit(1);
+	}
+
+
+//	s->newtp.c_cc[VMIN] = 0;
+//	s->newtp.c_cc[VTIME] = g->serial_timeout *10; // VTIME is 1/10th's of second
+
+	p = strchr(p,':');
+	if (p) {
+		p++;
+		switch (*p) {
+			case '8': 
+				s->newtp.c_cflag |= CS8;
+				break;
+			case '7': 
+				s->newtp.c_cflag |= CS7;
+				break;
+			default: 
+						 fprintf(stdout, "Meter only accepts 7 or 8 bit mode\n");
+		}
+
+		p++;
+		switch (*p) {
+			case 'o': 
+				s->newtp.c_cflag |= (PARENB|PARODD);
+				break;
+			case 'n': 
+				s->newtp.c_cflag &= ~(PARODD|PARENB);
+				break;
+			case 'e': 
+				s->newtp.c_cflag |= PARENB;
+				break;
+			default: 
+				fprintf(stdout, "Parity mode is [n]one, [o]dd, or [e]ven\n");
+		}
+
+		p++;
+		switch (*p) {
+			case '1': 
+				s->newtp.c_cflag &= ~CSTOPB;
+				break;
+			case '2': 
+				s->newtp.c_cflag |= CSTOPB;
+				break;
+			default: 
+				fprintf(stdout, "Stop bits are 1, or 2 only\n");
+		}
+
+	}
+
+	s->newtp.c_iflag &= ~(IXON | IXOFF | IXANY );
+
+	r = tcsetattr(s->fd, TCSANOW, &(s->newtp));
+	if (r) {
+		fprintf(stderr,"%s:%d: Error setting terminal (%s)\n", FL, strerror(errno));
+		exit(1);
+	}
+
+	fprintf(stdout,"Serial port opened, FD[%d]\n", s->fd);
+#endif
+}
+
 
 /*-----------------------------------------------------------------\
   Date Code:	: 20180127-220307
@@ -444,7 +555,7 @@ int main ( int argc, char **argv ) {
 	/*
 	 * Handle the COM Port
 	 */
-	open_port(&g.serial_params);
+	open_port(&g);
 
 	/*
 	 * Setup SDL2 and fonts
@@ -478,7 +589,7 @@ int main ( int argc, char **argv ) {
 	/* Clear the entire screen to our selected color. */
 	SDL_RenderClear(renderer);
 
-	//SDL_Color color = { 55, 255, 55 };
+	SDL_Color color = { 55, 255, 55 };
 
 
 	/*
@@ -523,7 +634,7 @@ int main ( int argc, char **argv ) {
 		i = 0;
 
 		do {
-			char temp_char;
+			uint8_t temp_char;
 			bytes_read = read(g.serial_params.fd, &temp_char, 1);
 			if (bytes_read == -1) {
 				comms_error = 1;
@@ -533,11 +644,12 @@ int main ( int argc, char **argv ) {
 
 			if (bytes_read > 0) {
 				d[i] = temp_char;
-				if (g.debug) { fprintf(stdout,"%02x ", d[i]); }
+				if (g.debug) { fprintf(stdout,"%02x ", d[i]); fflush(stdout); }
+
 
 				i++;
 
-				if (temp_char == 0x55) {
+				if ( temp_char == '\n' ) {
 					end_of_frame_received = 1;
 					break;
 				}
@@ -803,7 +915,7 @@ int main ( int argc, char **argv ) {
 		// SDL Render
 		// SDL Render
 		// SDL Render
-		{
+		if (1) {
 			SDL_RenderClear(renderer);
 			surface = TTF_RenderUTF8_Solid(font, line1, g.font_color);
 			texture = SDL_CreateTextureFromSurface(renderer, surface);
