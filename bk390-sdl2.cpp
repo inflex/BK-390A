@@ -731,7 +731,17 @@ int main ( int argc, char **argv ) {
 		 */
 		switch (d[BYTE_FUNCTION]) {
 			case FUNCTION_VOLTAGE:
-				snprintf(units, sizeof(units), "V");
+				switch (d[BYTE_OPTION_2] & 0xC) {
+					case 0x4:
+						snprintf(units, sizeof(units), "VAC");
+						break;
+					case 0x8:
+						snprintf(units, sizeof(units), "VDC");
+						break;
+					default:
+						snprintf(units, sizeof(units), "V");
+						break;
+				}
 				snprintf(mmmode, sizeof(mmmode), "Volts");
 
 				switch (d[BYTE_RANGE] & 0x0F) {
