@@ -917,7 +917,7 @@ int main ( int argc, char **argv ) {
 		// SDL Render
 		if (1) {
 			SDL_RenderClear(renderer);
-			surface = TTF_RenderUTF8_Solid(font, line1, g.font_color);
+			surface = TTF_RenderUTF8_Shaded(font, line1, g.font_color, g.background_color);
 			texture = SDL_CreateTextureFromSurface(renderer, surface);
 
 			int texW = 0;
