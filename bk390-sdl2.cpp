@@ -514,8 +514,8 @@ Changes:
 int main ( int argc, char **argv ) {
 
 	SDL_Event event;
-	SDL_Surface *surface;
-	SDL_Texture *texture;
+	SDL_Surface *surface = nullptr;
+	SDL_Texture *texture = nullptr;
 
 	char linetmp[SSIZE]; // temporary string for building main line of text
 	char prefix[SSIZE]; // Units prefix u, m, k, M etc
@@ -929,7 +929,9 @@ int main ( int argc, char **argv ) {
 		// SDL Render
 		if (1) {
 			SDL_RenderClear(renderer);
+			if (surface != nullptr) SDL_FreeSurface(surface);
 			surface = TTF_RenderUTF8_Shaded(font, line1, g.font_color, g.background_color);
+			if (texture != nullptr) SDL_DestroyTexture(texture);
 			texture = SDL_CreateTextureFromSurface(renderer, surface);
 
 			int texW = 0;
