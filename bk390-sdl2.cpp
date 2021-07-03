@@ -136,7 +136,8 @@ struct glb {
 	uint8_t quiet;
 	uint8_t show_mode;
 	uint16_t flags;
-	char *com_address;
+	//char *com_address;
+	int serial_timeout;
 	char *output_file;
 
 	char *serial_parameters_string;
@@ -179,8 +180,9 @@ int init(struct glb *g) {
 	g->debug = 0;
 	g->quiet = 0;
 	g->flags = 0;
-	g->com_address = NULL;
+//	g->com_address = NULL;
 	g->output_file = NULL;
+	g->serial_timeout = 2; // 0.2 seconds
 
 	g->font_size = 60;
 	g->window_width = 400;
@@ -213,7 +215,7 @@ void show_help(void) {
 			"\t-bc <background colour, 101010>\r\n"
 			"\r\n"
 			"\r\n"
-			"\texample: bside-adm20 -p /dev/ttyUSB0\r\n"
+			"\texample: bk390-sdl2 -p /dev/ttyUSB0\r\n"
 			, BUILD_VER
 			, BUILD_DATE 
 			);
@@ -358,41 +360,6 @@ int parse_parameters(struct glb *g, int argc, char **argv ) {
 }
 
 
-
-/*
- *
- * Default parameters are 2400:7none1, given that the multimeter
- * is shipped like this and cannot be changed then we shouldn't
- * have to worry about needing to make changes, but we'll probably
- * add that for future changes.
- *
- */
-/*
-void open_port(struct serial_params_s *s) {
-	int r; 
-
-	s->fd = open( s->device, O_RDWR | O_NOCTTY |O_NDELAY );
-	if (s->fd <0) {
-		perror( s->device );
-	}
-
-	fcntl(s->fd,F_SETFL,0);
-	tcgetattr(s->fd,&(s->oldtp)); // save current serial port settings 
-	tcgetattr(s->fd,&(s->newtp)); // save current serial port settings in to what will be our new settings
-	cfmakeraw(&(s->newtp));
-	s->newtp.c_cflag = B2400 | CS7 | PARODD | CREAD | CRTSCTS ; // Adjust the settings to suit our BK390A / 2400-7o1
-
-	cfsetospeed(&s->newtp, B2400);
-	cfsetispeed(&s->newtp, B2400);
-	r = tcsetattr(s->fd, TCSANOW, &(s->newtp));
-	if (r) {
-		fprintf(stderr,"%s:%d: Error setting terminal (%s)\n", FL, strerror(errno));
-		exit(1);
-	}
-}
-*/
-
-
 /*
  * Default parameters are 2400:8n1, given that the multimeter
  * is shipped like this and cannot be changed then we shouldn't
@@ -435,8 +402,8 @@ void open_port( struct glb *g ) {
 	}
 
 
-//	s->newtp.c_cc[VMIN] = 0;
-//	s->newtp.c_cc[VTIME] = g->serial_timeout *10; // VTIME is 1/10th's of second
+	s->newtp.c_cc[VMIN] = 0;
+	s->newtp.c_cc[VTIME] = g->serial_timeout *10; // VTIME is 1/10th's of second
 
 	p = strchr(p,':');
 	if (p) {

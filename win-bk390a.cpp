@@ -97,6 +97,9 @@ struct glb {
 	uint16_t flags;
 	uint8_t com_address;
 
+	int mmdata_active;
+	wchar_t mmdata_output_file[MAX_PATH];
+	wchar_t mmdata_output_temp_file[MAX_PATH];
 	wchar_t font_name[FONT_NAME_SIZE];
 	int font_size;
 	int font_weight;
@@ -158,6 +161,8 @@ int init(struct glb *g) {
 	g->font_weight = DEFAULT_FONT_WEIGHT;
 	g->com_address = DEFAULT_COM_PORT;
 
+	g->mmdata_active = 0;
+
 	StringCbPrintfW(g->font_name, FONT_NAME_SIZE, DEFAULT_FONT);
 	g->font_color = RGB(16, 255, 16);
 	g->background_color = RGB(0, 0, 0);
@@ -185,6 +190,7 @@ void show_help(void) {
 "\t-fw <weight>: Font weight, typically 100-to-900 range\r\n"
 "\t-wx <width>: Force Window width (normally calculated based on font size)\r\n"
 "\t-wy <height>: Force Window height\r\n"
+"\t-om <file>: Generate single line output file for FlexBV\r\n"
 "\t-d: debug enabled\r\n"
 "\t-q: quiet output\r\n"
 "\t-v: show version\r\n"
@@ -239,6 +245,15 @@ int parse_parameters(struct glb *g) {
 				case 'h':
 					show_help();
 					exit(1);
+					break;
+
+				case 'o':
+					if (argv[i][2] == 'm') {
+						i++;
+						StringCbPrintfW(g->mmdata_output_file, MAX_PATH, L"%s/mmdata.txt", argv[i]);
+						StringCbPrintfW(g->mmdata_output_temp_file, MAX_PATH, L"%s/mmdata.tmp", argv[i]);
+						g->mmdata_active = 1;
+					}
 					break;
 
 				case 'w':
@@ -982,6 +997,19 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 				}
 			}
 		} // if com-read status == TRUE
+
+		if (g.mmdata_active == 1) {
+			FILE *f = _wfopen(g.mmdata_output_file,L"rb");
+			if (f) {
+				fclose(f);
+			} 
+			else {
+				f = _wfopen(g.mmdata_output_temp_file,L"wb");
+				fprintf(f,"%s",linetmp);
+				fclose(f);
+				_wrename(g.mmdata_output_temp_file, g.mmdata_output_file);
+			}
+		}
 
 		StringCbPrintf(line1, sizeof(line1), L"%-40s", linetmp);
 		StringCbPrintf(line2, sizeof(line2), L"%-40s", mmmode);
