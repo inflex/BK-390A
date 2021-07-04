@@ -250,8 +250,8 @@ int parse_parameters(struct glb *g) {
 				case 'o':
 					if (argv[i][2] == 'm') {
 						i++;
-						StringCbPrintfW(g->mmdata_output_file, MAX_PATH, L"%s/mmdata.txt", argv[i]);
-						StringCbPrintfW(g->mmdata_output_temp_file, MAX_PATH, L"%s/mmdata.tmp", argv[i]);
+						StringCbPrintfW(g->mmdata_output_file, MAX_PATH, L"%s\\mmdata.txt", argv[i]);
+						StringCbPrintfW(g->mmdata_output_temp_file, MAX_PATH, L"%s\\mmdata.tmp", argv[i]);
 						g->mmdata_active = 1;
 					}
 					break;
