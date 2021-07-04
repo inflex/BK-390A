@@ -998,6 +998,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 			}
 		} // if com-read status == TRUE
 
+		// Write the mmdata file if it doesn't exist
+		// (ie, FBV has collected it)
+		//
 		if (g.mmdata_active == 1) {
 			FILE *f = _wfopen(g.mmdata_output_file,L"rb");
 			if (f) {
