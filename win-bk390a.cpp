@@ -1007,11 +1007,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 				fclose(f);
 			} 
 			else {
-				int ret;
-				char buf[1024];
 				f = _wfopen(g.mmdata_output_temp_file,L"wb");
-				ret = wcstombs ( buf, linetmp, sizeof(buf) );
-				fprintf(f,"%s",buf);
+				fwprintf(f,L"%ls\n",linetmp);
 				fclose(f);
 				_wrename(g.mmdata_output_temp_file, g.mmdata_output_file);
 			}
